@@ -54,6 +54,21 @@ test('flags real-looking secrets only in template files', () => {
   assert.equal(compare([{ name: '.env', text: `K=${key}` }, { name: '.env.prod', text: `K=${key}` }]).leaks.length, 0);
 });
 
+test('ignore skips keys by name and * wildcard, but never hides leaks', () => {
+  const key = 'AKIA' + 'ABCDEFGHIJKLMNOP';
+  const files = [{ name: '.env.example', text: `APP_URL=a\nDEBUG_X=1\nA.B=1\nAWS=${key}` }, { name: '.env', text: 'APP_URL=b\nAxB=1\nAWS=' }];
+  const r = compare(files, { ignore: ['APP_URL', 'DEBUG_*', 'A.B', 'AWS'] });
+  assert.deepEqual(r.different, []);
+  assert.deepEqual(r.missing, [{ file: '.env.example', keys: ['AxB'] }, { file: '.env', keys: [] }]);
+  assert.equal(r.leaks.length, 1);
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, 'a.env'), 'X=1\nY=1\nZ=1');
+  writeFileSync(join(d, 'b.env'), 'X=2\nY=2\nZ=1');
+  assert.equal(run(['a.env', 'b.env', '--ignore', 'X, Y'], d).code, 0);
+  assert.equal(run(['a.env', 'b.env', '--ignore', 'X', '--ignore', 'Y'], d).code, 0);
+  assert.equal(run(['a.env', 'b.env', '--ignore', 'X'], d).code, 1);
+});
+
 test('empty values warn in real env files but not in templates', () => {
   const r = compare([{ name: '.env.example', text: 'A=' }, { name: '.env', text: 'A=' }]);
   assert.deepEqual(r.warnings.map((w) => w.file), ['.env']);
