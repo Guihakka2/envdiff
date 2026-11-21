@@ -5,8 +5,8 @@ Compare `.env` files across environments (dev, staging, prod, `.env.example`) â€
 Safe to run in CI logs, screenshots and pull requests: values are compared in memory, only key names are shown.
 
 ```bash
-npx @guihakka/envdiff .env .env.example --keys-only
-npx @guihakka/envdiff .env.staging .env.production
+npx @guihakka2/envdiff .env .env.example --keys-only
+npx @guihakka2/envdiff .env.staging .env.production
 ```
 
 ```
@@ -36,7 +36,7 @@ Possible real secrets in template files:
 ## Use in CI (GitHub Actions)
 
 ```yaml
-- run: npx @guihakka/envdiff .env.example .env.ci --keys-only
+- run: npx @guihakka2/envdiff .env.example .env.ci --keys-only
 ```
 
 ## Options

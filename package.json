@@ -1,5 +1,5 @@
 {
-  "name": "@guihakka/envdiff",
+  "name": "@guihakka2/envdiff",
   "version": "0.1.0",
   "description": "Compare .env files across environments without ever printing secret values.",
   "type": "module",
