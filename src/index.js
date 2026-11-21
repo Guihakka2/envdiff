@@ -40,9 +40,14 @@ export const looksSecret = (v) => SECRET_PATTERNS.some((re) => re.test(v));
 const isTemplate = (name) => /example|sample|template|dist/i.test(name);
 
 // files: [{ name, text }] -> report with keys only; values never leave this function.
-export function compare(files, { keysOnly = false } = {}) {
+// Glob patterns (only * is special) -> anchored regexes.
+const toRegex = (glob) => new RegExp('^' + glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+
+export function compare(files, { keysOnly = false, ignore = [] } = {}) {
+  const ignored = ignore.map(toRegex);
+  const skip = (key) => ignored.some((re) => re.test(key));
   const parsed = files.map((f) => ({ name: f.name, ...parse(f.text) }));
-  const all = [...new Set(parsed.flatMap((p) => [...p.vars.keys()]))].sort();
+  const all = [...new Set(parsed.flatMap((p) => [...p.vars.keys()]))].filter((k) => !skip(k)).sort();
   const missing = parsed.map((p) => ({ file: p.name, keys: all.filter((k) => !p.vars.has(k)) }));
   const different = keysOnly ? [] : all.filter((k) => {
     const vals = parsed.filter((p) => p.vars.has(k)).map((p) => p.vars.get(k).value);
@@ -50,10 +55,11 @@ export function compare(files, { keysOnly = false } = {}) {
   });
   const warnings = [], leaks = [];
   for (const p of parsed) {
-    for (const d of p.duplicates) warnings.push({ file: p.name, key: d.key, type: 'duplicate', lines: d.lines });
+    for (const d of p.duplicates) if (!skip(d.key)) warnings.push({ file: p.name, key: d.key, type: 'duplicate', lines: d.lines });
     for (const line of p.invalid) warnings.push({ file: p.name, type: 'invalid-line', lines: [line] });
+    // Leak detection deliberately ignores --ignore: a real secret in a template is always reported.
     for (const [key, { value, line }] of p.vars) {
-      if (value === '' && !isTemplate(p.name)) warnings.push({ file: p.name, key, type: 'empty', lines: [line] });
+      if (value === '' && !isTemplate(p.name) && !skip(key)) warnings.push({ file: p.name, key, type: 'empty', lines: [line] });
       if (isTemplate(p.name) && looksSecret(value)) leaks.push({ file: p.name, key, type: 'secret-in-template', lines: [line] });
     }
   }
