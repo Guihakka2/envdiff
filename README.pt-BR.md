@@ -9,7 +9,7 @@ Seguro para logs de CI, prints e pull requests: os valores são comparados em me
 <p align="center"><img src="docs/demo.svg" alt="envdiff demo" width="760"></p>
 
 ```bash
-npx @guihakka2/envdiff            # compara .env.example com .env na pasta atual
+npx @guihakka2/envdiff            # compara todos os .env* da pasta atual
 npx @guihakka2/envdiff .env .env.example --keys-only
 npx @guihakka2/envdiff .env.staging .env.production
 ```
@@ -22,6 +22,9 @@ npx @guihakka2/envdiff .env.staging .env.production
 - Chaves duplicadas, valores vazios, linhas inválidas
 - **Segurança no git**: falha se um `.env` real foi comitado, avisa se não está no `.gitignore`
 - Dica **"did you mean?"** para erros de digitação como `DATABSE_URL`
+- **Varredura do código** (`--scan .`): chaves usadas no código que nenhum `.env` define, e chaves que ninguém usa
+- **Lint** e **aviso de expiração** com `# @expire 2027-03-31`
+- **Sem configuração**: sem argumentos, compara todos os `.env*` da pasta; ou use `.envdiffrc.json`
 - Saída `--json` e códigos de saída para CI: `0` em sincronia, `1` diferenças, `2` erro de uso
 - Zero dependências, funciona offline, nada é enviado para lugar nenhum
 
@@ -44,6 +47,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--table` | Grade de chaves × arquivos: `✗` faltando, mesma letra = mesmo valor |
 | `--fix` | Adiciona as chaves que faltam com valor **vazio**. Nunca copia valores. |
 | `--html ARQUIVO` | Gera também um relatório visual em HTML (nunca contém valores) |
+| `--scan PASTA` | Compara com as chaves usadas no código-fonte (`--scan .`) |
 | `--json` | Relatório para máquinas (nunca contém valores) |
 
 Documentação completa: [README em inglês](README.md). Licença MIT.

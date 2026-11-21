@@ -17,9 +17,10 @@ const files = {
   '.env.production': 'DATABASE_URL=postgres://prod\nSTRIPE_SECRET=sk_test_stg\n',
 };
 for (const [name, text] of Object.entries(files)) writeFileSync(join(d, name), text);
+writeFileSync(join(d, 'app.js'), 'const db = process.env.DATABASE_URL;\nconst mail = process.env.SMTP_HOST;\n');
 
 const scenes = [
-  ['npx @guihakka2/envdiff'],
+  ['npx @guihakka2/envdiff .env.example .env --scan .'],
   ['npx @guihakka2/envdiff .env.staging .env.production --table'],
   ['npx @guihakka2/envdiff .env.staging .env.production --fix --html report.html'],
 ].map(([cmd]) => {

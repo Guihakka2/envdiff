@@ -11,7 +11,8 @@ Safe to run in CI logs, screenshots and pull requests: values are compared in me
 <p align="center"><img src="docs/demo.svg" alt="envdiff demo" width="760"></p>
 
 ```bash
-npx @guihakka2/envdiff            # compares .env.example with .env in this folder
+npx @guihakka2/envdiff            # compares every .env* file in this folder
+npx @guihakka2/envdiff --scan .   # ...and checks them against the keys your code uses
 npx @guihakka2/envdiff .env .env.example --keys-only
 npx @guihakka2/envdiff .env.staging .env.production
 ```
@@ -39,6 +40,10 @@ Possible real secrets in template files:
 - Duplicate keys, empty values, malformed lines
 - **Git safety**: fails if a real `.env` is committed to git, warns if it is not in `.gitignore`
 - **Did you mean?** hints for typos like `DATABSE_URL`
+- **Code scan** (`--scan .`): keys your code reads (JS/TS, Python, Go, Ruby, PHP, Java, Rust, C#, docker-compose) but no env file defines, and keys nobody uses
+- **Lint**: lowercase keys, spaces around `=`, trailing whitespace, unquoted values with spaces
+- **Expiry**: `# @expire 2027-03-31` above a key warns when the token is expired or expires within 30 days
+- **Zero config**: with no arguments, compares every `.env*` file in the folder; or set defaults in `.envdiffrc.json`
 - `--json` output and exit codes for CI: `0` in sync, `1` differences, `2` usage error
 - Zero dependencies, runs offline, nothing is sent anywhere
 
@@ -54,6 +59,14 @@ Possible real secrets in template files:
 The report (key names only) is also written to the job summary. Needs Node 20+ on the runner (GitHub-hosted runners have it). Pin to a commit SHA for maximum supply-chain safety.
 
 Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
+
+## Config file (optional)
+
+`.envdiffrc.json` in the project root sets defaults; CLI flags win:
+
+```json
+{ "files": [".env.example", ".env.staging", ".env.production"], "ignore": ["APP_URL"], "strict": true, "scan": "." }
+```
 
 ## Visual report
 
@@ -75,6 +88,7 @@ One self-contained HTML file (dark and light mode, works offline, filter + "only
 | `--table` | Grid of keys × files: `✗` missing, same letter = same value (values never shown) |
 | `--fix` | Appends missing keys with **empty** values to the files that lack them. Never copies values, never edits existing lines. |
 | `--html FILE` | Also writes a visual HTML report (never contains values) |
+| `--scan DIR` | Compare with env keys used in source code (`--scan .`) |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |
 | `-v`, `--version` | Version |
