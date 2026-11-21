@@ -16,7 +16,7 @@ Goal: envdiff becomes the default safe way to check `.env` drift locally and in 
 
 ## Launch (after v0.2)
 - [x] README: comparison with alternatives (honest, verified)
-- [ ] README: demo GIF
+- [x] README: animated demo
 - [x] README.pt-BR.md and README.ja.md
 - [ ] Post: Show HN, r/devops, r/node, dev.to (EN) · Zenn, Qiita (JA) · TabNews (PT)
 - [ ] Submit to awesome-dotenv / awesome-devops style lists
