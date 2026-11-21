@@ -71,7 +71,9 @@ const rank = (n) => (/example|sample|template|dist/i.test(n) ? 0 : n === '.env' 
 const discovered = () => readdirSync('.').filter((n) => /^\.env(\..+)?$/.test(n) && !/(\.(bak|swp|tmp|orig|vault|keys|local\.php)|~)$/.test(n) && statSync(n).isFile())
   .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 const names = positionals.length ? positionals : rcFiles.length ? rcFiles : discovered();
-if (names.length < 2) {
+// One file is enough with --scan: the code is the other side (.env.example vs what the code reads).
+const scanning = o.scan !== undefined || typeof rc.scan === 'string';
+if (names.length < (scanning ? 1 : 2)) {
   if (zeroArg) console.error(`envdiff: found ${names.length} .env file(s) here, need at least 2.\nWith no arguments envdiff compares all .env* files in the current folder (e.g. .env.example and .env).\nRun envdiff --help for usage.`);
   else console.error(HELP);
   process.exit(2);

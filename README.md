@@ -12,7 +12,7 @@ Safe to run in CI logs, screenshots and pull requests: values are compared in me
 
 ```bash
 npx @guihakka2/envdiff            # compares every .env* file in this folder
-npx @guihakka2/envdiff --scan .   # ...and checks them against the keys your code uses
+npx @guihakka2/envdiff --scan .   # does .env.example cover every key the code reads?
 npx @guihakka2/envdiff .env .env.example --keys-only
 npx @guihakka2/envdiff .env.staging .env.production
 ```
@@ -40,7 +40,7 @@ Possible real secrets in template files:
 - Duplicate keys, empty values, malformed lines
 - **Git safety**: fails if a real `.env` is committed to git, warns if it is not in `.gitignore`
 - **Did you mean?** hints for typos like `DATABSE_URL`
-- **Code scan** (`--scan .`): keys your code reads (JS/TS, Python, Go, Ruby, PHP, Java, Rust, C#, docker-compose) but no env file defines, and keys nobody uses
+- **Code scan** (`--scan .`): keys your code reads but no env file defines, and keys nobody uses. Works with just `.env.example`. Understands `process.env.X`, `import.meta.env.X`, `env("X")` / `env.X` helpers, destructuring, t3-env schemas, Python, Go, Ruby, PHP, Java, Rust, C# and docker-compose; skips `node_modules`, build output and dot folders like `.github`
 - **Lint**: lowercase keys, spaces around `=`, trailing whitespace, unquoted values with spaces
 - **Expiry**: `# @expire 2027-03-31` above a key warns when the token is expired or expires within 30 days
 - **Zero config**: with no arguments, compares every `.env*` file in the folder; or set defaults in `.envdiffrc.json`
