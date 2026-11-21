@@ -6,6 +6,8 @@
 
 CI のログ、スクリーンショット、プルリクエストにそのまま貼っても安全です。値はメモリ上で比較され、表示されるのはキー名だけです。
 
+<p align="center"><img src="docs/demo.svg" alt="envdiff demo" width="760"></p>
+
 ```bash
 npx @guihakka2/envdiff            # 現在のフォルダの .env.example と .env を比較
 npx @guihakka2/envdiff .env .env.example --keys-only

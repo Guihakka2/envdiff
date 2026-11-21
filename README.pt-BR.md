@@ -6,6 +6,8 @@ Compare arquivos `.env` entre ambientes (dev, staging, prod, `.env.example`) —
 
 Seguro para logs de CI, prints e pull requests: os valores são comparados em memória e só os nomes das chaves aparecem.
 
+<p align="center"><img src="docs/demo.svg" alt="envdiff demo" width="760"></p>
+
 ```bash
 npx @guihakka2/envdiff            # compara .env.example com .env na pasta atual
 npx @guihakka2/envdiff .env .env.example --keys-only
