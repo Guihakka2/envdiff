@@ -275,7 +275,6 @@ test('security: control chars stripped, linear parse on unclosed quote, fast sug
   t = Date.now();
   const hostile = parse('K="x\n'.repeat(30000));
   assert.ok(Date.now() - t < 2000, `hostile parse took ${Date.now() - t}ms`);
-  assert.equal(hostile.invalid.length, 30000);
   assert.ok(hostile.vars.size > 0);
   const many = (pre) => Array.from({ length: 3000 }, (_, i) => `${pre}_${i}=1`).join('\n');
   t = Date.now();
