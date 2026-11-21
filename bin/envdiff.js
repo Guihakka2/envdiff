@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync, appendFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { spawnSync } from 'node:child_process';
+import { basename, dirname, resolve } from 'node:path';
 import { compare } from '../src/index.js';
 
 const HELP = `Usage: envdiff [<file> <file> [more files...]] [options]
@@ -43,7 +45,18 @@ catch (e) {
 }
 
 const ignore = (o.ignore ?? []).flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
-const opts = { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict };
+// Ask git (if installed and the file is in a repo) whether each file is committed or not ignored.
+const gitCode = (name, args) => {
+  const res = spawnSync('git', [...args, '--', basename(name)], { cwd: dirname(resolve(name)), stdio: 'ignore' });
+  return res.error ? null : res.status;
+};
+const git = { tracked: [], unignored: [] };
+for (const { name } of files) {
+  if (gitCode(name, ['rev-parse', '--is-inside-work-tree']) !== 0) continue;
+  if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(name);
+  else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(name);
+}
+const opts = { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict, git };
 let r = compare(files, opts);
 const fixed = [];
 if (o.fix) {
@@ -77,9 +90,11 @@ if (o.table) {
   out.push('', c(2, 'Same letter = same value. Values are never shown.'), '');
 }
 for (const f of fixed) out.push(c(32, `Added to ${f.file} (empty values):`), ...f.keys.map((k) => `  + ${k}`), '');
-for (const m of r.missing) if (m.keys.length) out.push(c(31, `Missing in ${m.file}:`), ...m.keys.map((k) => `  - ${k}`), '');
+const hint = (file, k) => { const s = r.suggestions.find((x) => x.file === file && x.missing === k); return s ? c(2, `  (did you mean ${s.similar}?)`) : ''; };
+for (const m of r.missing) if (m.keys.length) out.push(c(31, `Missing in ${m.file}:`), ...m.keys.map((k) => `  - ${k}${hint(m.file, k)}`), '');
 if (r.different.length) out.push(c(33, 'Different values (hidden):'), ...r.different.map((k) => `  ~ ${k}`), '');
-if (r.leaks.length) out.push(c(31, 'Possible real secrets in template files:'), ...r.leaks.map((w) => `  ! ${w.file}: ${w.key}${at(w)}`), '');
+const leakMsg = (w) => (w.type === 'tracked-by-git' ? `  ! ${w.file} is committed to git: remove it (git rm --cached) and rotate its secrets` : `  ! ${w.file}: ${w.key}${at(w)} looks like a real secret in a template file`);
+if (r.leaks.length) out.push(c(31, 'Security problems:'), ...r.leaks.map(leakMsg), '');
 if (r.warnings.length) out.push(c(36, 'Warnings:'), ...r.warnings.map((w) => `  ! ${w.file}: ${w.type}${w.key ? ' ' + w.key : ''}${at(w)}`), '');
 out.push(r.ok ? c(32, '✓ In sync') : c(31, '✗ Not in sync'));
 console.log(out.join('\n'));

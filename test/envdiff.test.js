@@ -105,6 +105,33 @@ test('fix appends missing keys with empty values, never copies values', () => {
   assert.equal(run(['--fix'], d).out.includes('Added'), false); // idempotent
 });
 
+test('did-you-mean suggests likely typos', () => {
+  const r = compare([{ name: 'a', text: 'DATABASE_URL=1\nPORT=1' }, { name: 'b', text: 'DATABSE_URL=1\nHOST=1' }]);
+  assert.deepEqual(r.suggestions, [{ file: 'a', missing: 'DATABSE_URL', similar: 'DATABASE_URL' }, { file: 'b', missing: 'DATABASE_URL', similar: 'DATABSE_URL' }]);
+  assert.equal(compare([{ name: 'a', text: 'PORT=1' }, { name: 'b', text: 'HOST=1' }]).suggestions.length, 0); // too short / too different
+});
+
+test('git: committed .env fails, un-ignored .env warns, templates are fine', () => {
+  const git = { tracked: ['.env', '.env.example'], unignored: ['.env.prod'] };
+  const r = compare([{ name: '.env', text: 'A=1' }, { name: '.env.example', text: 'A=' }, { name: '.env.prod', text: 'A=1' }], { keysOnly: true, git });
+  assert.deepEqual(r.leaks, [{ file: '.env', type: 'tracked-by-git' }]);
+  assert.deepEqual(r.warnings, [{ file: '.env.prod', type: 'not-gitignored' }]);
+  assert.equal(r.ok, false);
+
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  const g = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: d, stdio: 'ignore' });
+  g('init', '-q');
+  writeFileSync(join(d, '.env.example'), 'A=');
+  writeFileSync(join(d, '.env'), 'A=1');
+  const warned = run([], d);
+  assert.equal(warned.code, 0);
+  assert.match(warned.out, /\.env: not-gitignored/);
+  g('add', '.env'); g('commit', '-qm', 'oops');
+  const failed = run([], d);
+  assert.equal(failed.code, 1);
+  assert.match(failed.out, /\.env is committed to git/);
+});
+
 test('strict turns warnings into failures', () => {
   const files = [{ name: 'a.env', text: 'A=1\nA=1' }, { name: 'b.env', text: 'A=1' }];
   assert.equal(compare(files).ok, true);

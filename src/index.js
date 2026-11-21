@@ -45,18 +45,40 @@ const isTemplate = (name) => /example|sample|template|dist/i.test(name);
 // Glob patterns (only * is special) -> anchored regexes.
 const toRegex = (glob) => new RegExp('^' + glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
 
-export function compare(files, { keysOnly = false, ignore = [], strict = false } = {}) {
+const distance = (a, b) => {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+};
+
+// git: { tracked: [file names committed to git], unignored: [file names not covered by .gitignore] }
+export function compare(files, { keysOnly = false, ignore = [], strict = false, git = {} } = {}) {
   const ignored = ignore.map(toRegex);
   const skip = (key) => ignored.some((re) => re.test(key));
   const parsed = files.map((f) => ({ name: f.name, ...parse(f.text) }));
   const all = [...new Set(parsed.flatMap((p) => [...p.vars.keys()]))].filter((k) => !skip(k)).sort();
   const missing = parsed.map((p) => ({ file: p.name, keys: all.filter((k) => !p.vars.has(k)) }));
+  // "Did you mean": a missing key that looks like a typo of a key only this file has.
+  const suggestions = [];
+  for (const [i, m] of missing.entries()) {
+    const own = [...parsed[i].vars.keys()].filter((k) => !skip(k) && parsed.some((p, j) => j !== i && !p.vars.has(k)));
+    for (const key of m.keys) {
+      const similar = own.find((k) => key.length > 3 && distance(key, k) <= (key.length >= 8 ? 2 : 1));
+      if (similar) suggestions.push({ file: m.file, missing: key, similar });
+    }
+  }
   const different = keysOnly ? [] : all.filter((k) => {
     const vals = parsed.filter((p) => p.vars.has(k)).map((p) => p.vars.get(k).value);
     return vals.length > 1 && new Set(vals).size > 1;
   });
   const warnings = [], leaks = [];
   for (const p of parsed) {
+    if (!isTemplate(p.name) && git.tracked?.includes(p.name)) leaks.push({ file: p.name, type: 'tracked-by-git' });
+    else if (!isTemplate(p.name) && git.unignored?.includes(p.name)) warnings.push({ file: p.name, type: 'not-gitignored' });
     for (const d of p.duplicates) if (!skip(d.key)) warnings.push({ file: p.name, key: d.key, type: 'duplicate', lines: d.lines });
     for (const line of p.invalid) warnings.push({ file: p.name, type: 'invalid-line', lines: [line] });
     // Leak detection deliberately ignores --ignore: a real secret in a template is always reported.
@@ -79,5 +101,5 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false }
     return { key, cells };
   });
   const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !(strict && warnings.length);
-  return { files: parsed.map((p) => p.name), missing, different, warnings, leaks, table, ok };
+  return { files: parsed.map((p) => p.name), missing, suggestions, different, warnings, leaks, table, ok };
 }

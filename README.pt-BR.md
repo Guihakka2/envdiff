@@ -20,6 +20,8 @@ npx @guihakka2/envdiff .env.staging .env.production
 - Valores diferentes, mostrando só o nome da chave
 - Detecta segredos reais (AWS, GitHub, GitLab, npm, OpenAI, Stripe, Slack, Google, Azure, JWT, chaves privadas) esquecidos em `.example` / `.sample` / `.template`
 - Chaves duplicadas, valores vazios, linhas inválidas
+- **Segurança no git**: falha se um `.env` real foi comitado, avisa se não está no `.gitignore`
+- Dica **"did you mean?"** para erros de digitação como `DATABSE_URL`
 - Saída `--json` e códigos de saída para CI: `0` em sincronia, `1` diferenças, `2` erro de uso
 - Zero dependências, funciona offline, nada é enviado para lugar nenhum
 
