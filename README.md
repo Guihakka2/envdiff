@@ -37,6 +37,8 @@ Possible real secrets in template files:
 - Changed values, shown only as key names
 - Detects real-looking secrets (AWS, GitHub, GitLab, npm, OpenAI, Stripe, Slack, Google, Azure, JWT, private keys) committed in `.example` / `.sample` / `.template` files
 - Duplicate keys, empty values, malformed lines
+- **Git safety**: fails if a real `.env` is committed to git, warns if it is not in `.gitignore`
+- **Did you mean?** hints for typos like `DATABSE_URL`
 - `--json` output and exit codes for CI: `0` in sync, `1` differences, `2` usage error
 - Zero dependencies, runs offline, nothing is sent anywhere
 

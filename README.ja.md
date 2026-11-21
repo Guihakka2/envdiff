@@ -20,6 +20,8 @@ npx @guihakka2/envdiff .env.staging .env.production
 - 値が異なるキーをキー名だけで表示
 - `.example` / `.sample` / `.template` ファイルに紛れ込んだ本物の秘密情報（AWS、GitHub、GitLab、npm、OpenAI、Stripe、Slack、Google、Azure、JWT、秘密鍵）を検出
 - 重複キー、空の値、不正な行
+- **Git の安全確認**：本物の `.env` がコミットされていれば失敗、`.gitignore` になければ警告
+- `DATABSE_URL` のような打ち間違いに **did you mean?** で候補を表示
 - `--json` 出力と CI 用の終了コード：`0` 一致、`1` 差分あり、`2` 使い方の誤り
 - 依存パッケージなし、オフラインで動作、データはどこにも送信されません
 
