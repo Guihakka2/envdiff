@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,6 +79,30 @@ test('secret patterns: GitLab, npm, Azure, JWT (positive and negative)', () => {
   const no = ['glpat-short', 'npm_tooshort', 'AccountKey=<your-key>', 'eyJhbGciOi', 'changeme', ''];
   for (const v of yes) assert.equal(looksSecret(v), true, v);
   for (const v of no) assert.equal(looksSecret(v), false, v);
+});
+
+test('table groups equal values without exposing them', () => {
+  const r = compare([{ name: 'a', text: 'X=1\nY=1' }, { name: 'b', text: 'X=2' }, { name: 'c', text: 'X=1\nY=9' }]);
+  assert.deepEqual(r.table, [{ key: 'X', cells: [0, 1, 0] }, { key: 'Y', cells: [0, null, 1] }]);
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, 'a.env'), 'X=topsecret\nY=1');
+  writeFileSync(join(d, 'b.env'), 'X=othersecret');
+  const out = run(['a.env', 'b.env', '--table'], d).out;
+  assert.match(out, /X\s+A\s+B/);
+  assert.match(out, /Y\s+A\s+✗/);
+  assert.ok(!out.includes('topsecret') && !out.includes('othersecret'));
+});
+
+test('fix appends missing keys with empty values, never copies values', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, '.env.example'), 'A=\r\nB=\r\n');
+  writeFileSync(join(d, '.env'), 'A=1\r\nC=supersecret'); // CRLF, no trailing newline
+  const r = run(['--fix'], d);
+  assert.equal(r.code, 0);
+  assert.equal(readFileSync(join(d, '.env'), 'utf8'), 'A=1\r\nC=supersecret\r\nB=\r\n');
+  assert.equal(readFileSync(join(d, '.env.example'), 'utf8'), 'A=\r\nB=\r\nC=\r\n');
+  assert.ok(!r.out.includes('supersecret'));
+  assert.equal(run(['--fix'], d).out.includes('Added'), false); // idempotent
 });
 
 test('strict turns warnings into failures', () => {

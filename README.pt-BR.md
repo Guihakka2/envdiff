@@ -39,6 +39,8 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--keys-only` | Compara só os nomes das chaves |
 | `--ignore LISTA` | Ignora chaves, separadas por vírgula, com curinga `*`. Segredos vazados continuam sendo denunciados. |
 | `--strict` | Avisos também falham (código 1) |
+| `--table` | Grade de chaves × arquivos: `✗` faltando, mesma letra = mesmo valor |
+| `--fix` | Adiciona as chaves que faltam com valor **vazio**. Nunca copia valores. |
 | `--json` | Relatório para máquinas (nunca contém valores) |
 
 Documentação completa: [README em inglês](README.md). Licença MIT.

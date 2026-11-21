@@ -60,6 +60,8 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 | `--keys-only` | Compare key names only (use with `.env.example`) |
 | `--ignore LIST` | Skip keys expected to differ, comma-separated, `*` wildcard: `--ignore APP_URL,DEBUG_*`. Can repeat. Leaked secrets are still reported. |
 | `--strict` | Warnings (duplicate key, empty value, invalid line) also fail with exit code 1 |
+| `--table` | Grid of keys × files: `✗` missing, same letter = same value (values never shown) |
+| `--fix` | Appends missing keys with **empty** values to the files that lack them. Never copies values, never edits existing lines. |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |
 | `-v`, `--version` | Version |
