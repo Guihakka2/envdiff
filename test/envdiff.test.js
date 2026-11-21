@@ -23,6 +23,23 @@ test('parse handles export, quotes, comments, duplicates, invalid lines', () => 
   assert.deepEqual(r.invalid, [6]);
 });
 
+test('parse handles multiline values and escaped quotes', () => {
+  const r = parse([
+    'KEY="-----BEGIN PRIVATE KEY-----', 'abc', '-----END PRIVATE KEY-----"',
+    'Q="say \\"hi\\"\\nbye"', "S='a\\nb'", "M='x", "y'",
+    'BROKEN="never closed', 'AFTER=ok',
+  ].join('\n'));
+  assert.equal(r.vars.get('KEY').value, '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----');
+  assert.equal(r.vars.get('KEY').line, 1);
+  assert.equal(r.vars.get('Q').value, 'say "hi"\nbye');
+  assert.equal(r.vars.get('S').value, 'a\\nb');
+  assert.equal(r.vars.get('M').value, 'x\ny');
+  assert.equal(r.vars.get('AFTER').value, 'ok');
+  assert.deepEqual(r.invalid, [8]);
+  const leak = compare([{ name: '.env.example', text: 'KEY="-----BEGIN RSA PRIVATE KEY-----\nzz\n-----END RSA PRIVATE KEY-----"' }, { name: '.env', text: 'KEY=' }]);
+  assert.equal(leak.leaks.length, 1);
+});
+
 test('compare finds missing and different keys', () => {
   const r = compare([{ name: 'dev', text: 'A=1\nB=2' }, { name: 'prod', text: 'A=1\nB=3\nC=4' }]);
   assert.deepEqual(r.missing, [{ file: 'dev', keys: ['C'] }, { file: 'prod', keys: [] }]);
