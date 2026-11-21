@@ -5,6 +5,7 @@ Compare `.env` files across environments (dev, staging, prod, `.env.example`) â€
 Safe to run in CI logs, screenshots and pull requests: values are compared in memory, only key names are shown.
 
 ```bash
+npx @guihakka2/envdiff            # compares .env.example with .env in this folder
 npx @guihakka2/envdiff .env .env.example --keys-only
 npx @guihakka2/envdiff .env.staging .env.production
 ```

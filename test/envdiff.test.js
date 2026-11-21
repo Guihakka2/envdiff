@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { parse, compare } from '../src/index.js';
 
 const bin = fileURLToPath(new URL('../bin/envdiff.js', import.meta.url));
-const run = (args) => {
-  try { return { code: 0, out: execFileSync(process.execPath, [bin, ...args]).toString() }; }
+const run = (args, cwd) => {
+  try { return { code: 0, out: execFileSync(process.execPath, [bin, ...args], { cwd, stdio: 'pipe' }).toString() }; }
   catch (e) { return { code: e.status, out: e.stdout.toString() + e.stderr.toString() }; }
 };
 
@@ -51,4 +51,18 @@ test('CLI never prints values and sets exit codes', () => {
   assert.equal(run([a]).code, 2);
   assert.equal(run([a, join(d, 'nope.env')]).code, 2);
   assert.equal(run([a, a]).code, 0);
+});
+
+test('zero-arg mode compares .env.example with .env, keys only', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  const missing = run([], d);
+  assert.equal(missing.code, 2);
+  assert.match(missing.out, /\.env\.example and \.env/);
+  writeFileSync(join(d, '.env.example'), 'A=\nB=');
+  writeFileSync(join(d, '.env'), 'A=real\nB=other');
+  assert.equal(run([], d).code, 0);
+  writeFileSync(join(d, '.env'), 'A=real');
+  const r = run([], d);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Missing in \.env:\n  - B/);
 });
