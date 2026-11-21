@@ -47,6 +47,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--table` | Grade de chaves × arquivos: `✗` faltando, mesma letra = mesmo valor |
 | `--fix` | Adiciona as chaves que faltam com valor **vazio**. Nunca copia valores. |
 | `--html ARQUIVO` | Gera também um relatório visual em HTML (nunca contém valores) |
+| `--open` | Abre o relatório visual no navegador |
 | `--scan PASTA` | Compara com as chaves usadas no código-fonte (`--scan .`) |
 | `--json` | Relatório para máquinas (nunca contém valores) |
 

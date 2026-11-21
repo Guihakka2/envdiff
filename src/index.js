@@ -123,7 +123,7 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
       if (!groups.includes(v)) groups.push(v);
       return groups.indexOf(v);
     });
-    return { key, cells };
+    return { key, cells, lines: parsed.map((p) => p.vars.get(key)?.line ?? null) };
   });
   // used: Map<key, [{file, line}]> from scanCode(). Code needs a key no env file defines -> fail; defined but unused -> warn.
   const undefinedInCode = used ? [...used].filter(([k]) => !skip(k) && !parsed.some((p) => p.vars.has(k))).map(([key, refs]) => ({ key, refs })).sort((a, b) => a.key.localeCompare(b.key)) : [];

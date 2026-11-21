@@ -84,7 +84,7 @@ test('secret patterns: GitLab, npm, Azure, JWT (positive and negative)', () => {
 
 test('table groups equal values without exposing them', () => {
   const r = compare([{ name: 'a', text: 'X=1\nY=1' }, { name: 'b', text: 'X=2' }, { name: 'c', text: 'X=1\nY=9' }]);
-  assert.deepEqual(r.table, [{ key: 'X', cells: [0, 1, 0] }, { key: 'Y', cells: [0, null, 1] }]);
+  assert.deepEqual(r.table, [{ key: 'X', cells: [0, 1, 0], lines: [1, 1, 1] }, { key: 'Y', cells: [0, null, 1], lines: [2, null, 2] }]);
   const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
   writeFileSync(join(d, 'a.env'), 'X=topsecret\nY=1');
   writeFileSync(join(d, 'b.env'), 'X=othersecret');
@@ -146,7 +146,7 @@ test('html report: no values, escaped names, refuses to overwrite inputs', () =>
   const r = run(['a.env', 'b.env', '--html', 'report.html'], d);
   assert.equal(r.code, 1);
   const out = readFileSync(join(d, 'report.html'), 'utf8');
-  assert.match(out, /Keys by environment/);
+  assert.match(out, /class="editor"/);
   assert.ok(!out.includes('supersecret') && !out.includes('othersecret'));
   assert.equal(run(['a.env', 'b.env', '--html', 'b.env'], d).code, 2);
   assert.equal(readFileSync(join(d, 'b.env'), 'utf8'), 'X=othersecret');
@@ -200,7 +200,7 @@ test('zero-arg mode compares .env.example with .env, keys only', () => {
 test('template values are placeholders: never counted as different', () => {
   const r = compare([{ name: '.env.example', text: 'A=changeme' }, { name: '.env.dev', text: 'A=1' }, { name: '.env.prod', text: 'A=1' }]);
   assert.deepEqual(r.different, []);
-  assert.deepEqual(r.table, [{ key: 'A', cells: [-1, 0, 0] }]);
+  assert.deepEqual(r.table, [{ key: 'A', cells: [-1, 0, 0], lines: [1, 1, 1] }]);
   assert.equal(r.ok, true);
 });
 

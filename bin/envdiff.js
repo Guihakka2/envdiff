@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync, appendFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { spawnSync } from 'node:child_process';
-import { basename, dirname, resolve } from 'node:path';
+import { spawnSync, spawn } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { basename, dirname, resolve, join } from 'node:path';
 import { compare } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
 import { scanCode } from '../src/scan.js';
@@ -20,6 +21,7 @@ Options:
   --table       Key x file grid: ✗ missing, same letter = same value
   --fix         Append missing keys (empty values) to the files that lack them
   --html FILE   Also write a visual HTML report (never contains values)
+  --open        Open the visual report in your browser (temp file if no --html)
   --scan DIR    Scan source code in DIR: keys used in code but not defined fail,
                 defined keys never used in code warn (e.g. --scan .)
   --json        Machine-readable output
@@ -32,7 +34,7 @@ let args;
 try {
   args = parseArgs({ allowPositionals: true, options: {
     'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
-    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' },
+    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' }, open: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
 } catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
 const { values: o, positionals } = args;
@@ -95,10 +97,18 @@ if (o.fix) {
   }
   r = compare(files, opts);
 }
+// --open without --html: write the report to a temp file (it never contains values) and open it.
+if (o.open && !o.html) o.html = join(tmpdir(), `envdiff-report-${Date.now()}.html`);
 if (o.html) {
   if (names.some((n) => resolve(n) === resolve(o.html))) { console.error("envdiff: --html must not overwrite an input file"); process.exit(2); }
   try { writeFileSync(o.html, renderHtml(r, { keysOnly: opts.keysOnly })); } catch (e) { console.error(`envdiff: cannot write ${o.html}: ${e.code}`); process.exit(2); }
   if (!o.json) console.error(`envdiff: report written to ${o.html}`);
+  if (o.open) {
+    // explorer.exe / open / xdg-open take the path as one argument: no shell, so file names can't inject commands.
+    const cmd = process.platform === 'win32' ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    const args = [resolve(o.html)];
+    spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => console.error('envdiff: could not open a browser; open the file above manually')).unref();
+  }
 }
 if (o.json) { console.log(JSON.stringify(o.fix ? { ...r, fixed } : r, null, 2)); process.exit(r.ok ? 0 : 1); }
 

@@ -71,12 +71,13 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 ## Visual report
 
 ```bash
-npx @guihakka2/envdiff .env.example .env.development .env.staging .env.production --html report.html
+npx @guihakka2/envdiff --open                      # opens the visual report in your browser
+npx @guihakka2/envdiff --scan . --html report.html  # or save it, e.g. as a CI artifact
 ```
 
-<p align="center"><img src="docs/report.png" alt="envdiff HTML report: key by environment grid, security problems and stats" width="760"></p>
+<p align="center"><img src="docs/report.png" alt="envdiff side-by-side report: one column per env file, missing and different keys highlighted, values masked" width="760"></p>
 
-One self-contained HTML file (dark and light mode, works offline, filter + "only problems"). Like the terminal output, it **never contains values**, so it is safe to attach to CI runs or share with your team.
+A side-by-side, editor-style view: one column per env file with line numbers, red bands for missing keys, amber bands for different values, ▲▼ (or `j` / `k`) to jump between problems, filter and "only problems". One self-contained HTML file, dark and light mode, works offline. Values show as `••••••` plus a letter (same letter = same value): the file **never contains values**, so it is safe to attach to CI runs or share with your team.
 
 ## Options
 
@@ -88,6 +89,7 @@ One self-contained HTML file (dark and light mode, works offline, filter + "only
 | `--table` | Grid of keys × files: `✗` missing, same letter = same value (values never shown) |
 | `--fix` | Appends missing keys with **empty** values to the files that lack them. Never copies values, never edits existing lines. |
 | `--html FILE` | Also writes a visual HTML report (never contains values) |
+| `--open` | Opens the visual report in your browser |
 | `--scan DIR` | Compare with env keys used in source code (`--scan .`) |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |
