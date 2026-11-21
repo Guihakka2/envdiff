@@ -80,7 +80,7 @@ if (o.html) {
 }
 if (o.json) { console.log(JSON.stringify(o.fix ? { ...r, fixed } : r, null, 2)); process.exit(r.ok ? 0 : 1); }
 
-const color = process.stdout.isTTY && !process.env.NO_COLOR;
+const color = (process.stdout.isTTY || !!process.env.FORCE_COLOR) && !process.env.NO_COLOR;
 const c = (code, s) => (color ? `\x1b[${code}m${s}\x1b[0m` : s);
 const at = (w) => (w.lines ? ` (line ${w.lines.join(', ')})` : '');
 const out = [c(1, `envdiff  ${r.files.join('  vs  ')}`), ''];

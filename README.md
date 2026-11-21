@@ -61,7 +61,7 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 npx @guihakka2/envdiff .env.example .env.development .env.staging .env.production --html report.html
 ```
 
-<p align="center"><img src="docs/report.jpg" alt="envdiff HTML report: key by environment grid, security problems and stats" width="760"></p>
+<p align="center"><img src="docs/report.png" alt="envdiff HTML report: key by environment grid, security problems and stats" width="760"></p>
 
 One self-contained HTML file (dark and light mode, works offline, filter + "only problems"). Like the terminal output, it **never contains values**, so it is safe to attach to CI runs or share with your team.
 
