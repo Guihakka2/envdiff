@@ -240,3 +240,24 @@ test('lint: style problems and @expire, never values', async () => {
   assert.deepEqual(r.warnings, [{ file: '.env.example', key: 'OLD_TOKEN', type: 'expired 2026-01-01', lines: [2] }]);
   assert.equal(compare([{ name: '.env.example', text: '# @expire 2026-01-01\nOLD_TOKEN=' }, { name: '.env', text: 'OLD_TOKEN=x' }], { today: '2026-11-21', strict: true }).ok, false);
 });
+
+test('no args: discovers every .env* file; .envdiffrc.json sets files/ignore/strict', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, '.env.example'), 'A=\nB=\n');
+  writeFileSync(join(d, '.env'), 'A=1\nB=1\n');
+  writeFileSync(join(d, '.env.production'), 'A=2\n');
+  writeFileSync(join(d, '.env.bak'), 'IGNORED_BACKUP=1\n');
+  const r = run([], d);
+  assert.match(r.out, /envdiff  \.env\.example  vs  \.env  vs  \.env\.production/);
+  assert.match(r.out, /Missing in \.env\.production:\n  - B/);
+  assert.ok(!r.out.includes('IGNORED_BACKUP'));
+  assert.equal(r.code, 1);
+
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ files: ['.env.example', '.env'], ignore: ['A'] }));
+  assert.equal(run([], d).code, 0);
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ files: ['.env.example', '.env'], strict: true }));
+  writeFileSync(join(d, '.env'), 'A=1\nB=\n');
+  assert.equal(run([], d).code, 1); // empty B is a warning; strict from config makes it fail
+  writeFileSync(join(d, '.envdiffrc.json'), '{"ignore": "A"}');
+  assert.equal(run([], d).code, 2);
+});
