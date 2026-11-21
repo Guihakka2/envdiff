@@ -16,3 +16,4 @@ You will get a reply within 7 days.
 - `.envdiffrc.json` cannot make envdiff read files or scan folders outside the project folder, and cannot enable any option that writes files.
 - `--fix` only appends `KEY=` lines; `--html` refuses to overwrite an input file; `--open` uses a private temp folder and launches the browser without a shell.
 - Parsing and "did you mean" stay fast on hostile input (unclosed quotes, thousands of keys).
+- Security problems (leaked secrets, committed `.env`, missing `.gitignore`) can never be hidden by `.envdiff-baseline.json`.

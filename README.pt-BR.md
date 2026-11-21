@@ -48,6 +48,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--fix` | Adiciona as chaves que faltam com valor **vazio**. Nunca copia valores. |
 | `--html ARQUIVO` | Gera também um relatório visual em HTML (nunca contém valores) |
 | `--open` | Abre o relatório visual no navegador |
+| `--baseline` | Grava os problemas atuais em `.envdiff-baseline.json`; depois só os novos falham (segurança nunca entra) |
 | `--scan PASTA` | Compara com as chaves usadas no código-fonte (`--scan .`) |
 | `--json` | Relatório para máquinas (nunca contém valores) |
 

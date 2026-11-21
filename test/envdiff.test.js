@@ -341,3 +341,30 @@ test('scan from real-world use: helpers, destructuring, env files, less noise; o
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /envdiff  \.env\.example/);
 });
+
+test('baseline: hides known problems, reports new ones, never hides security problems', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  const key = 'AKIA' + 'ABCDEFGHIJKLMNOP';
+  writeFileSync(join(d, '.env.example'), `A=\nB=\nLEAK=${key}\n`);
+  writeFileSync(join(d, '.env'), 'A=supersecret\nOLD=1\n');
+
+  let r = run(['--baseline'], d);
+  const saved = JSON.parse(readFileSync(join(d, '.envdiff-baseline.json'), 'utf8'));
+  assert.deepEqual(saved.problems, ['missing|.env.example|OLD', 'missing|.env|B', 'missing|.env|LEAK']);
+  assert.ok(!JSON.stringify(saved).includes('supersecret') && !JSON.stringify(saved).includes(key));
+  assert.equal(r.code, 1); // the leaked secret still fails
+  assert.match(r.out, /Security problems/);
+  assert.match(r.out, /3 known problem\(s\) hidden/);
+
+  writeFileSync(join(d, '.env.example'), 'A=\nB=\nLEAK=\n'); // secret removed
+  r = run([], d);
+  assert.equal(r.code, 0, r.out);
+  writeFileSync(join(d, '.env.example'), 'A=\nB=\nLEAK=\nNEW_KEY=\n');
+  r = run([], d);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Missing in \.env:\n  - NEW_KEY\n/); // only the new problem
+  assert.match(run(['--ignore-baseline'], d).out, /  - B\n/);
+
+  writeFileSync(join(d, '.envdiff-baseline.json'), '{"problems": "x"}');
+  assert.equal(run([], d).code, 2);
+});

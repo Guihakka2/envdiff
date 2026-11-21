@@ -48,6 +48,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--fix` | 不足しているキーを**空の値**で追記。値はコピーしません。 |
 | `--html FILE` | 見やすい HTML レポートも出力（値は含まれません） |
 | `--open` | ビジュアルレポートをブラウザで開く |
+| `--baseline` | 現在の問題を `.envdiff-baseline.json` に保存し、以降は新しい問題だけを報告（セキュリティ問題は対象外） |
 | `--scan DIR` | ソースコードで使われている環境変数と比較（`--scan .`） |
 | `--json` | 機械可読なレポート（値は含まれません） |
 
