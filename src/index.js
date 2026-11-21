@@ -18,7 +18,7 @@ const unescape = (s) => s.replace(/\\([nrt"\\])/g, (_, c) => ({ n: '\n', r: '\r'
 export function parse(text) {
   const vars = new Map(), duplicates = [], invalid = [];
   const noCloseFrom = {}; // quote char -> first line index from which no closing quote exists (hostile files stay linear)
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/); // BOM: Windows Notepad adds it
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line || line.startsWith('#')) continue;
@@ -47,10 +47,15 @@ export function lint(text, today = new Date().toISOString().slice(0, 10)) {
   const issues = [];
   let expire = null;
   const soon = new Date(Date.parse(today) + 30 * 864e5).toISOString().slice(0, 10);
-  text.split(/\r?\n/).forEach((raw, i) => {
+  text.replace(/^﻿/, '').split(/\r?\n/).forEach((raw, i) => {
     const line = i + 1, t = raw.trim();
-    const exp = t.match(/^#\s*@expire\s+(\d{4}-\d{2}-\d{2})\b/);
-    if (exp) { expire = exp[1]; return; }
+    const exp = t.match(/^#\s*@expire\s+(\S+)/);
+    if (exp) {
+      const dt = new Date(exp[1]); // also rejects impossible dates like 2026-02-30
+      const ok = /^\d{4}-\d{2}-\d{2}$/.test(exp[1]) && !isNaN(dt) && dt.toISOString().slice(0, 10) === exp[1];
+      if (ok) expire = exp[1]; else issues.push({ type: 'invalid-expire-date', line });
+      return;
+    }
     const m = t.match(LINE);
     if (!m) { if (t && !t.startsWith('#')) expire = null; return; }
     const [, key, val] = m;
@@ -92,7 +97,7 @@ const deletions = (s, max) => {
   return all;
 };
 
-const distance = (a, b) => {
+export const distance = (a, b) => {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const cur = [i];

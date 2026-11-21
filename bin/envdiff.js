@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { spawnSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve, join, relative, isAbsolute } from 'node:path';
-import { compare, printable } from '../src/index.js';
+import { compare, printable, distance } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
 import { scanCode } from '../src/scan.js';
 
@@ -30,13 +30,21 @@ Options:
 
 Exit codes: 0 = in sync, 1 = differences or leaked secret, 2 = usage error`;
 
+const OPTIONS = {
+  'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
+  table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' }, open: { type: 'boolean' },
+  help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } };
 let args;
 try {
-  args = parseArgs({ allowPositionals: true, options: {
-    'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
-    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' }, open: { type: 'boolean' },
-    help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
-} catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
+  args = parseArgs({ allowPositionals: true, options: OPTIONS });
+} catch (e) {
+  // Short, friendly error with a suggestion instead of Node's long parseArgs message.
+  const bad = e.message.match(/'(-[^' <]*)/)?.[1];
+  const near = bad && Object.keys(OPTIONS).map((k) => `--${k}`).find((k) => distance(bad, k) <= 2);
+  const why = /argument missing/.test(e.message) ? `${bad} needs a value` : `unknown option ${bad}${near ? `. Did you mean ${near}?` : ''}`;
+  console.error(`envdiff: ${bad ? printable(why) : e.message}\nRun envdiff --help for all options.`);
+  process.exit(2);
+}
 const { values: o, positionals } = args;
 if (o.help) { console.log(HELP); process.exit(0); }
 if (o.version) { console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version); process.exit(0); }
@@ -71,8 +79,11 @@ if (names.length < 2) {
 
 let files;
 // Display names are stripped of terminal control characters; real paths stay in names[].
-try { files = names.map((name) => ({ name: printable(name), text: readFileSync(name, 'utf8') })); }
-catch (e) { console.error(`envdiff: cannot read ${e.path}: ${e.code}`); process.exit(2); }
+// Read each file on its own so the error names the right path (EISDIR has no e.path).
+files = names.map((name) => {
+  try { return { name: printable(name), text: readFileSync(name, 'utf8') }; }
+  catch (e) { console.error(`envdiff: cannot read ${printable(name)}: ${e.code === 'EISDIR' ? 'it is a folder, not a file' : e.code}`); process.exit(2); }
+});
 
 const ignore = [...list(rc.ignore, 'ignore'), ...(o.ignore ?? [])].flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
 if (o.scan === undefined && typeof rc.scan === 'string') o.scan = inside(rc.scan, 'scan');
@@ -89,6 +100,7 @@ for (const [i, name] of names.entries()) {
   if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(files[i].name);
   else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(files[i].name);
 }
+if (o.scan !== undefined && !statSync(o.scan, { throwIfNoEntry: false })?.isDirectory()) { console.error(`envdiff: --scan folder not found: ${printable(o.scan)}`); process.exit(2); }
 const opts = { keysOnly: !!o['keys-only'], ignore, strict: o.strict, git, used: o.scan === undefined ? null : scanCode(resolve(o.scan)) };
 let r = compare(files, opts);
 const fixed = [];
