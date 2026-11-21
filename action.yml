@@ -25,5 +25,7 @@ runs:
         set -f +e
         out=$(node "$ENVDIFF_BIN" $ENVDIFF_FILES $ENVDIFF_ARGS 2>&1); code=$?
         echo "$out"
-        { echo '### envdiff'; echo '```'; echo "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        # HTML-escaped inside <pre>: file names from the repo can't break out and inject markdown/links.
+        safe=$(printf '%s' "$out" | sed -e 's/\x1b\[[0-9;]*m//g' -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/`/\&#96;/g')
+        { echo '### envdiff'; echo '<pre>'; printf '%s\n' "$safe"; echo '</pre>'; } >> "$GITHUB_STEP_SUMMARY"
         exit $code

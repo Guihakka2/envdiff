@@ -1,13 +1,18 @@
 const LINE = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$/;
 
-// Index of the closing quote; backslash escapes apply only inside double quotes (dotenv semantics).
-const closing = (s, q) => {
-  for (let k = 0; k < s.length; k++) {
+// [index of the closing quote or -1, where to resume]. Resuming keeps multiline parsing linear even
+// when a quote is never closed. Backslash escapes apply only inside double quotes (dotenv semantics).
+const closing = (s, q, from = 0) => {
+  let k = from;
+  for (; k < s.length; k++) {
     if (q === '"' && s[k] === '\\') k++;
-    else if (s[k] === q) return k;
+    else if (s[k] === q) return [k, k];
   }
-  return -1;
+  return [-1, k];
 };
+
+// Strips terminal control characters (ESC etc.) from names before printing them.
+export const printable = (s) => String(s).replace(/[\x00-\x1f\x7f-\x9f]/g, '?');
 const unescape = (s) => s.replace(/\\([nrt"\\])/g, (_, c) => ({ n: '\n', r: '\r', t: '\t' })[c] ?? c);
 
 export function parse(text) {
@@ -21,8 +26,8 @@ export function parse(text) {
     let [, key, val] = m;
     const start = i + 1, q = val[0];
     if (q === '"' || q === "'" || q === '`') {
-      let body = val.slice(1), end = closing(body, q), j = i;
-      while (end < 0 && j + 1 < lines.length) { body += '\n' + lines[++j]; end = closing(body, q); }
+      let body = val.slice(1), [end, at] = closing(body, q), j = i;
+      while (end < 0 && j + 1 < lines.length) { body += '\n' + lines[++j]; [end, at] = closing(body, q, at); }
       if (end < 0) { invalid.push(start); val = val.slice(1); } // unclosed quote: don't swallow the rest of the file
       else { val = body.slice(0, end); i = j; if (q === '"') val = unescape(val); }
     } else val = val.replace(/\s+#.*$/, '').trim();
@@ -68,6 +73,20 @@ const isTemplate = (name) => /example|sample|template|dist/i.test(name);
 // Glob patterns (only * is special) -> anchored regexes.
 const toRegex = (glob) => new RegExp('^' + glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
 
+const deletions = (s, max) => {
+  const all = new Set([s]);
+  let frontier = [s];
+  for (let d = 0; d < max; d++) {
+    const next = [];
+    for (const w of frontier) for (let i = 0; i < w.length; i++) {
+      const v = w.slice(0, i) + w.slice(i + 1);
+      if (!all.has(v)) { all.add(v); next.push(v); }
+    }
+    frontier = next;
+  }
+  return all;
+};
+
 const distance = (a, b) => {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
@@ -89,9 +108,16 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
   const suggestions = [];
   for (const [i, m] of missing.entries()) {
     const own = [...parsed[i].vars.keys()].filter((k) => !skip(k) && parsed.some((p, j) => j !== i && !p.vars.has(k)));
+    // Deletion index: two strings within edit distance 2 share a variant with <= 2 chars deleted,
+    // so candidates are found by lookup instead of comparing every pair (fast with thousands of keys).
+    const index = new Map();
+    own.forEach((k, pos) => { for (const v of deletions(k, 2)) { if (!index.has(v)) index.set(v, []); index.get(v).push(pos); } });
     for (const key of m.keys) {
-      const similar = own.find((k) => key.length > 3 && distance(key, k) <= (key.length >= 8 ? 2 : 1));
-      if (similar) suggestions.push({ file: m.file, missing: key, similar });
+      if (key.length <= 3) continue;
+      const max = key.length >= 8 ? 2 : 1;
+      const candidates = new Set([...deletions(key, max)].flatMap((v) => index.get(v) ?? []));
+      const pos = [...candidates].sort((a, b) => a - b).find((p) => distance(key, own[p]) <= max);
+      if (pos !== undefined) suggestions.push({ file: m.file, missing: key, similar: own[pos] });
     }
   }
   const different = keysOnly ? [] : all.filter((k) => {

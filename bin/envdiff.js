@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync, appendFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, appendFileSync, writeFileSync, readdirSync, statSync, mkdtempSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { spawnSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { basename, dirname, resolve, join } from 'node:path';
-import { compare } from '../src/index.js';
+import { basename, dirname, resolve, join, relative, isAbsolute } from 'node:path';
+import { compare, printable } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
 import { scanCode } from '../src/scan.js';
 
@@ -49,7 +49,13 @@ const list = (v, name) => {
   if (!Array.isArray(v) || !v.every((s) => typeof s === 'string')) { console.error(`envdiff: .envdiffrc.json "${name}" must be a list of strings`); process.exit(2); }
   return v;
 };
-const rcFiles = list(rc.files, 'files');
+// A repo's config must not make envdiff read outside that repo (e.g. ../../.ssh).
+const inside = (p, name) => {
+  const rel = relative(process.cwd(), resolve(p));
+  if (rel.startsWith('..') || isAbsolute(rel)) { console.error(`envdiff: .envdiffrc.json "${name}" must stay inside this folder: ${printable(p)}`); process.exit(2); }
+  return p;
+};
+const rcFiles = list(rc.files, 'files').map((p) => inside(p, 'files'));
 
 // No files given: config files, else every .env* file here (templates first, then .env, then the rest).
 const zeroArg = positionals.length === 0 && !rcFiles.length;
@@ -64,11 +70,12 @@ if (names.length < 2) {
 }
 
 let files;
-try { files = names.map((name) => ({ name, text: readFileSync(name, 'utf8') })); }
+// Display names are stripped of terminal control characters; real paths stay in names[].
+try { files = names.map((name) => ({ name: printable(name), text: readFileSync(name, 'utf8') })); }
 catch (e) { console.error(`envdiff: cannot read ${e.path}: ${e.code}`); process.exit(2); }
 
 const ignore = [...list(rc.ignore, 'ignore'), ...(o.ignore ?? [])].flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
-if (o.scan === undefined && typeof rc.scan === 'string') o.scan = rc.scan;
+if (o.scan === undefined && typeof rc.scan === 'string') o.scan = inside(rc.scan, 'scan');
 if (o.strict === undefined && rc.strict === true) o.strict = true;
 if (o['keys-only'] === undefined && rc.keysOnly === true) o['keys-only'] = true;
 // Ask git (if installed and the file is in a repo) whether each file is committed or not ignored.
@@ -77,10 +84,10 @@ const gitCode = (name, args) => {
   return res.error ? null : res.status;
 };
 const git = { tracked: [], unignored: [] };
-for (const { name } of files) {
+for (const [i, name] of names.entries()) {
   if (gitCode(name, ['rev-parse', '--is-inside-work-tree']) !== 0) continue;
-  if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(name);
-  else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(name);
+  if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(files[i].name);
+  else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(files[i].name);
 }
 const opts = { keysOnly: !!o['keys-only'], ignore, strict: o.strict, git, used: o.scan === undefined ? null : scanCode(resolve(o.scan)) };
 let r = compare(files, opts);
@@ -91,18 +98,18 @@ if (o.fix) {
     if (!m.keys.length) continue;
     const f = files[i], eol = f.text.includes('\r\n') ? '\r\n' : '\n';
     const add = (f.text && !f.text.endsWith('\n') ? eol : '') + m.keys.map((k) => `${k}=`).join(eol) + eol;
-    try { appendFileSync(f.name, add); } catch (e) { console.error(`envdiff: cannot write ${f.name}: ${e.code}`); process.exit(2); }
+    try { appendFileSync(names[i], add); } catch (e) { console.error(`envdiff: cannot write ${f.name}: ${e.code}`); process.exit(2); }
     f.text += add;
     fixed.push({ file: f.name, keys: m.keys });
   }
   r = compare(files, opts);
 }
 // --open without --html: write the report to a temp file (it never contains values) and open it.
-if (o.open && !o.html) o.html = join(tmpdir(), `envdiff-report-${Date.now()}.html`);
+if (o.open && !o.html) o.html = join(mkdtempSync(join(tmpdir(), 'envdiff-')), 'report.html'); // private new dir: no symlink tricks
 if (o.html) {
   if (names.some((n) => resolve(n) === resolve(o.html))) { console.error("envdiff: --html must not overwrite an input file"); process.exit(2); }
   try { writeFileSync(o.html, renderHtml(r, { keysOnly: opts.keysOnly })); } catch (e) { console.error(`envdiff: cannot write ${o.html}: ${e.code}`); process.exit(2); }
-  if (!o.json) console.error(`envdiff: report written to ${o.html}`);
+  if (!o.json) console.error(`envdiff: report written to ${printable(o.html)}`);
   if (o.open) {
     // explorer.exe / open / xdg-open take the path as one argument: no shell, so file names can't inject commands.
     const cmd = process.platform === 'win32' ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';

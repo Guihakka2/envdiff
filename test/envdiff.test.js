@@ -261,3 +261,34 @@ test('no args: discovers every .env* file; .envdiffrc.json sets files/ignore/str
   writeFileSync(join(d, '.envdiffrc.json'), '{"ignore": "A"}');
   assert.equal(run([], d).code, 2);
 });
+
+test('security: control chars stripped, linear parse on unclosed quote, fast suggestions', async () => {
+  const { printable } = await import('../src/index.js');
+  assert.equal(printable('a\x1b[31mb\x07c'), 'a?[31mb?c');
+
+  const big = 'A="never closed\n' + 'X=1\n'.repeat(50000);
+  let t = Date.now();
+  const p = parse(big);
+  assert.ok(Date.now() - t < 2000, `parse took ${Date.now() - t}ms`);
+  assert.deepEqual(p.invalid, [1]);
+  assert.equal(p.vars.get('X').value, '1');
+
+  const many = (pre) => Array.from({ length: 3000 }, (_, i) => `${pre}_${i}=1`).join('\n');
+  t = Date.now();
+  compare([{ name: 'a', text: many('ALPHA_KEY') }, { name: 'b', text: many('BETA_KEY') }]);
+  assert.ok(Date.now() - t < 3000, `compare took ${Date.now() - t}ms`);
+});
+
+test('security: .envdiffrc.json cannot point outside the project', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, '.env.example'), 'A=\n');
+  writeFileSync(join(d, '.env'), 'A=1\n');
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ files: ['.env', '../../outside.env'] }));
+  let r = run([], d);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /must stay inside this folder/);
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ scan: tmpdir() }));
+  assert.equal(run([], d).code, 2);
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ scan: '.' }));
+  assert.equal(run([], d).code, 0);
+});
