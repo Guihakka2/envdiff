@@ -1,14 +1,34 @@
 {
   "name": "@guihakka2/envdiff",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Compare .env files across environments without ever printing secret values.",
   "type": "module",
-  "bin": { "envdiff": "bin/envdiff.js" },
+  "bin": {
+    "envdiff": "bin/envdiff.js"
+  },
   "exports": "./src/index.js",
-  "files": ["bin", "src"],
-  "engines": { "node": ">=20" },
-  "scripts": { "test": "node --test" },
-  "keywords": ["dotenv", "env", "diff", "config", "devops", "cli", "secrets"],
-  "repository": { "type": "git", "url": "git+https://github.com/Guihakka2/envdiff.git" },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "dotenv",
+    "env",
+    "diff",
+    "config",
+    "devops",
+    "cli",
+    "secrets"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guihakka2/envdiff.git"
+  },
   "license": "MIT"
 }
