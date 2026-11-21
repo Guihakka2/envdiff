@@ -1,6 +1,7 @@
 // Finds env variable names referenced in source code. Read-only, no network, values never involved.
 import { readdirSync, readFileSync, lstatSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { printable } from './index.js';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt', '.svelte-kit', 'vendor', 'coverage', '.venv', 'venv', '__pycache__', 'target']);
 const CODE = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx', '.vue', '.svelte', '.astro', '.py', '.go', '.rb', '.php', '.java', '.kt', '.rs', '.cs']);
@@ -52,7 +53,7 @@ export function scanCode(root) {
             const key = m[1];
             if (BUILTIN.has(key)) continue;
             if (!found.has(key)) found.set(key, []);
-            found.get(key).push({ file: relative(root, path).replace(/\\/g, '/'), line: i + 1 });
+            found.get(key).push({ file: printable(relative(root, path).replace(/\\/g, '/')), line: i + 1 });
           }
         }
       });
