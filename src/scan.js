@@ -5,7 +5,7 @@ import { printable } from './index.js';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt', '.svelte-kit', 'vendor', 'coverage', '.venv', 'venv', '__pycache__', 'target']);
 const CODE = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx', '.vue', '.svelte', '.astro', '.py', '.go', '.rb', '.php', '.java', '.kt', '.rs', '.cs']);
-const CONFIG = new Set(['.yml', '.yaml', '.sh']); // ${VAR} interpolation only makes sense here
+const isCompose = (n) => /^(docker-)?compose(\.[\w-]+)?\.ya?ml$/i.test(n); // ${VAR} only in compose files (CI/Helm yaml use other vars)
 const NAME = '([A-Za-z_][A-Za-z0-9_]*)';
 const CODE_PATTERNS = [
   new RegExp(`process\\.env\\.${NAME}`, 'g'),
@@ -21,7 +21,15 @@ const CODE_PATTERNS = [
   new RegExp(`System\\.getenv\\(\\s*"${NAME}"`, 'g'),
   new RegExp(`env::var\\(\\s*"${NAME}"`, 'g'),
   new RegExp(`GetEnvironmentVariable\\(\\s*"${NAME}"`, 'g'),
+  // Common helpers: env('X') / getEnv('X') (next-runtime-env etc.), t3-env style env.X and zod schemas X: z.string()
+  new RegExp(`\\b(?:env|getEnv|requireEnv|readEnv|mustEnv)\\(\\s*['"\`]${NAME}['"\`]`, 'g'),
+  /(?<![.\w$])env\.([A-Z][A-Z0-9_]*)\b/g, // not process.env.X / import.meta.env.X (matched above)
 ];
+// const { A, B: alias } = process.env
+const DESTRUCTURE = /\{([^}]*)\}\s*=\s*process\.env\b/g;
+// t3-env style schemas (X: z.string()) count only inside env files, not in any zod schema.
+const ZOD_KEY = /^\s*([A-Z][A-Z0-9_]+)\s*:\s*z\./g;
+const isEnvFile = (n) => /^env(\.[\w-]+)*\.[cm]?[jt]s$/i.test(n);
 const CONFIG_PATTERNS = [/\$\{([A-Z_][A-Z0-9_]*)(?::?[-?+][^}]*)?\}/g];
 // Set by the OS/runtime, almost never in .env files.
 export const BUILTIN = new Set(['NODE_ENV', 'PATH', 'HOME', 'PWD', 'USER', 'SHELL', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'TZ', 'CI', 'HOSTNAME', 'GITHUB_ACTIONS', 'GITHUB_TOKEN', 'DEV', 'PROD', 'MODE', 'SSR', 'BASE_URL']);
@@ -39,22 +47,24 @@ export function scanCode(root) {
       if (count >= MAX_FILES) return;
       const path = join(dir, e.name);
       if (e.isSymbolicLink()) continue; // avoid loops and leaving the project
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) walk(path); continue; }
-      const ext = extname(e.name).toLowerCase();
-      const patterns = CODE.has(ext) ? CODE_PATTERNS : CONFIG.has(ext) || /^(docker-)?compose/.test(e.name) ? CONFIG_PATTERNS : null;
+      // Dot folders (.github, .husky, .agents…) hold CI/tooling vars, not app config.
+      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) walk(path); continue; }
+      const code = CODE.has(extname(e.name).toLowerCase());
+      const patterns = code ? CODE_PATTERNS : isCompose(e.name) ? CONFIG_PATTERNS : null;
       if (!patterns) continue;
       try { if (lstatSync(path).size > MAX_BYTES) continue; } catch { continue; }
       count++;
-      const lines = readFileSync(path, 'utf8').split(/\r?\n/);
-      lines.forEach((text, i) => {
-        for (const re of patterns) {
-          re.lastIndex = 0;
-          for (const m of text.matchAll(re)) {
-            const key = m[1];
-            if (BUILTIN.has(key)) continue;
-            if (!found.has(key)) found.set(key, []);
-            found.get(key).push({ file: printable(relative(root, path).replace(/\\/g, '/')), line: i + 1 });
-          }
+      const file = printable(relative(root, path).replace(/\\/g, '/'));
+      const add = (key, line) => {
+        if (BUILTIN.has(key) || key.startsWith('__')) return; // __X: framework internals
+        if (!found.has(key)) found.set(key, []);
+        found.get(key).push({ file, line });
+      };
+      readFileSync(path, 'utf8').split(/\r?\n/).forEach((text, i) => {
+        for (const re of patterns) for (const m of text.matchAll(re)) add(m[1], i + 1);
+        if (code && isEnvFile(e.name)) for (const m of text.matchAll(ZOD_KEY)) add(m[1], i + 1);
+        if (code) for (const m of text.matchAll(DESTRUCTURE)) {
+          for (const part of m[1].split(',')) { const k = part.split(':')[0].trim(); if (/^[A-Za-z_]\w*$/.test(k)) add(k, i + 1); }
         }
       });
     }

@@ -323,3 +323,21 @@ test('friendly errors for unknown or incomplete options', () => {
   assert.equal(r.code, 2);
   assert.match(r.out, /--html needs a value/);
 });
+
+test('scan from real-world use: helpers, destructuring, env files, less noise; one file is enough', async () => {
+  const { scanCode } = await import('../src/scan.js');
+  const { mkdirSync } = await import('node:fs');
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-real-'));
+  for (const dir of ['src', '.github/workflows', 'charts']) mkdirSync(join(d, dir), { recursive: true });
+  writeFileSync(join(d, 'src', 'a.ts'), "env('RUNTIME_URL'); env.T3_KEY; const { DEST_A, DEST_B: b } = process.env;\nconst s = z.object({ ID: z.string() });\nprocess.env.__NEXT_INTERNAL;");
+  writeFileSync(join(d, 'src', 'env.ts'), 'export const env = createEnv({ server: {\n  ZOD_KEY: z.string(),\n} });');
+  writeFileSync(join(d, '.github', 'workflows', 'ci.yml'), 'token: ${CI_ONLY_SECRET}');
+  writeFileSync(join(d, 'charts', 'values.yaml'), 'url: ${HELM_ONLY}');
+  writeFileSync(join(d, 'compose.yaml'), 'image: app:${TAG}');
+  assert.deepEqual([...scanCode(d).keys()].sort(), ['DEST_A', 'DEST_B', 'RUNTIME_URL', 'T3_KEY', 'TAG', 'ZOD_KEY']);
+
+  writeFileSync(join(d, '.env.example'), 'RUNTIME_URL=\nT3_KEY=\nDEST_A=\nDEST_B=\nZOD_KEY=\nTAG=\n');
+  const r = run(['--scan', '.'], d); // only one env file: the code is the other side
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /envdiff  \.env\.example/);
+});
