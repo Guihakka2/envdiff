@@ -46,6 +46,7 @@ Possible real secrets in template files:
 |---|---|
 | `--keys-only` | Compare key names only (use with `.env.example`) |
 | `--ignore LIST` | Skip keys expected to differ, comma-separated, `*` wildcard: `--ignore APP_URL,DEBUG_*`. Can repeat. Leaked secrets are still reported. |
+| `--strict` | Warnings (duplicate key, empty value, invalid line) also fail with exit code 1 |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |
 | `-v`, `--version` | Version |

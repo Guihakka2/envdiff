@@ -11,6 +11,7 @@ With no files, compares .env.example and .env in the current folder (keys only).
 Options:
   --keys-only   Only compare keys (useful against .env.example)
   --ignore LIST Skip keys, comma-separated, * wildcard (e.g. --ignore APP_URL,DEBUG_*)
+  --strict      Warnings (duplicate, empty, invalid line) also fail
   --json        Machine-readable output
   -h, --help    Show help
   -v, --version Show version
@@ -20,7 +21,7 @@ Exit codes: 0 = in sync, 1 = differences or leaked secret, 2 = usage error`;
 let args;
 try {
   args = parseArgs({ allowPositionals: true, options: {
-    'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true },
+    'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
 } catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
 const { values: o, positionals } = args;
@@ -39,7 +40,7 @@ catch (e) {
 }
 
 const ignore = (o.ignore ?? []).flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
-const r = compare(files, { keysOnly: o['keys-only'] || zeroArg, ignore });
+const r = compare(files, { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict });
 if (o.json) { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }
 
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
