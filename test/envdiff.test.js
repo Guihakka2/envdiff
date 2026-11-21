@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse, compare, looksSecret } from '../src/index.js';
+import { renderHtml } from '../src/html.js';
 
 const bin = fileURLToPath(new URL('../bin/envdiff.js', import.meta.url));
 const run = (args, cwd) => {
@@ -132,6 +133,25 @@ test('git: committed .env fails, un-ignored .env warns, templates are fine', () 
   assert.match(failed.out, /\.env is committed to git/);
 });
 
+test('html report: no values, escaped names, refuses to overwrite inputs', () => {
+  const evil = '<img src=x onerror=alert(1)>.env';
+  const html = renderHtml(compare([{ name: evil, text: 'A=topsecret' }, { name: 'b.env', text: 'A=other\nB=1' }]));
+  assert.ok(!html.includes('<img') && html.includes('&lt;img'));
+  assert.ok(!html.includes('topsecret') && !html.includes('other'));
+  assert.match(html, /Content-Security-Policy/);
+
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, 'a.env'), 'X=supersecret\nY=1');
+  writeFileSync(join(d, 'b.env'), 'X=othersecret');
+  const r = run(['a.env', 'b.env', '--html', 'report.html'], d);
+  assert.equal(r.code, 1);
+  const out = readFileSync(join(d, 'report.html'), 'utf8');
+  assert.match(out, /Keys by environment/);
+  assert.ok(!out.includes('supersecret') && !out.includes('othersecret'));
+  assert.equal(run(['a.env', 'b.env', '--html', 'b.env'], d).code, 2);
+  assert.equal(readFileSync(join(d, 'b.env'), 'utf8'), 'X=othersecret');
+});
+
 test('strict turns warnings into failures', () => {
   const files = [{ name: 'a.env', text: 'A=1\nA=1' }, { name: 'b.env', text: 'A=1' }];
   assert.equal(compare(files).ok, true);
@@ -175,4 +195,11 @@ test('zero-arg mode compares .env.example with .env, keys only', () => {
   const r = run([], d);
   assert.equal(r.code, 1);
   assert.match(r.out, /Missing in \.env:\n  - B/);
+});
+
+test('template values are placeholders: never counted as different', () => {
+  const r = compare([{ name: '.env.example', text: 'A=changeme' }, { name: '.env.dev', text: 'A=1' }, { name: '.env.prod', text: 'A=1' }]);
+  assert.deepEqual(r.different, []);
+  assert.deepEqual(r.table, [{ key: 'A', cells: [-1, 0, 0] }]);
+  assert.equal(r.ok, true);
 });

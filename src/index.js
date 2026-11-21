@@ -72,7 +72,7 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
     }
   }
   const different = keysOnly ? [] : all.filter((k) => {
-    const vals = parsed.filter((p) => p.vars.has(k)).map((p) => p.vars.get(k).value);
+    const vals = parsed.filter((p) => p.vars.has(k) && !isTemplate(p.name)).map((p) => p.vars.get(k).value);
     return vals.length > 1 && new Set(vals).size > 1;
   });
   const warnings = [], leaks = [];
@@ -94,6 +94,7 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
     const cells = parsed.map((p) => {
       if (!p.vars.has(key)) return null;
       if (keysOnly) return 0;
+      if (isTemplate(p.name)) return -1; // template: present, value not compared (placeholders)
       const v = p.vars.get(key).value;
       if (!groups.includes(v)) groups.push(v);
       return groups.indexOf(v);
