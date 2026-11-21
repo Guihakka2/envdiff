@@ -295,3 +295,31 @@ test('security: .envdiffrc.json cannot point outside the project', () => {
   writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ scan: '.' }));
   assert.equal(run([], d).code, 0);
 });
+
+test('day 2 edge cases: BOM, bad @expire, folder as input, missing scan folder', async () => {
+  const { lint } = await import('../src/index.js');
+  assert.deepEqual(lint('﻿A=1\nB=2'), []); // BOM is not a leading space
+  assert.equal(parse('﻿A=1').vars.get('A').value, '1');
+  assert.deepEqual(lint('# @expire 2026-13-45\nT=1\n# @expire 2026-02-30\nU=1\n# @expire soon\nV=1', '2026-11-21').map((x) => x.type),
+    ['invalid-expire-date', 'invalid-expire-date', 'invalid-expire-date']);
+
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(d, 'sub'));
+  writeFileSync(join(d, 'a.env'), 'A=1');
+  let r = run(['sub', 'a.env'], d);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /cannot read sub: it is a folder, not a file/);
+  r = run(['a.env', 'a.env', '--scan', 'nope'], d);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /--scan folder not found: nope/);
+});
+
+test('friendly errors for unknown or incomplete options', () => {
+  let r = run(['a', 'b', '--tabel']);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /unknown option --tabel\. Did you mean --table\?/);
+  r = run(['a', 'b', '--html']);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /--html needs a value/);
+});
