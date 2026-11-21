@@ -32,6 +32,29 @@ export function parse(text) {
   return { vars, duplicates, invalid };
 }
 
+// Style problems that break some dotenv loaders, plus `# @expire YYYY-MM-DD` comments on the line above a key.
+export function lint(text, today = new Date().toISOString().slice(0, 10)) {
+  const issues = [];
+  let expire = null;
+  const soon = new Date(Date.parse(today) + 30 * 864e5).toISOString().slice(0, 10);
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const line = i + 1, t = raw.trim();
+    const exp = t.match(/^#\s*@expire\s+(\d{4}-\d{2}-\d{2})\b/);
+    if (exp) { expire = exp[1]; return; }
+    const m = t.match(LINE);
+    if (!m) { if (t && !t.startsWith('#')) expire = null; return; }
+    const [, key, val] = m;
+    if (/[a-z]/.test(key)) issues.push({ type: 'lowercase-key', key, line });
+    if (/^\s/.test(raw)) issues.push({ type: 'leading-space', key, line });
+    if (/[ \t]+$/.test(raw)) issues.push({ type: 'trailing-whitespace', key, line });
+    if (/^(?:export\s+)?\S+\s+=|=[ \t]+\S/.test(t)) issues.push({ type: 'space-around-equals', key, line });
+    if (!/^["'`]/.test(val) && /\s/.test(val.replace(/\s+#.*$/, '').trim())) issues.push({ type: 'unquoted-space', key, line });
+    if (expire) issues.push({ type: expire < today ? 'expired' : expire <= soon ? 'expires-soon' : null, key, line, date: expire });
+    expire = null;
+  });
+  return issues.filter((x) => x.type);
+}
+
 const SECRET_PATTERNS = [
   /AKIA[0-9A-Z]{16}/, /\bgh[pousr]_[A-Za-z0-9]{30,}/, /github_pat_\w{20,}/, /\bsk-[A-Za-z0-9_-]{20,}/,
   /\b[sr]k_live_\w{10,}/, /\bxox[abprs]-[\w-]{10,}/, /-----BEGIN [A-Z ]*PRIVATE KEY/, /\bAIza[\w-]{35}/,
@@ -56,10 +79,10 @@ const distance = (a, b) => {
 };
 
 // git: { tracked: [file names committed to git], unignored: [file names not covered by .gitignore] }
-export function compare(files, { keysOnly = false, ignore = [], strict = false, git = {}, used = null } = {}) {
+export function compare(files, { keysOnly = false, ignore = [], strict = false, git = {}, used = null, today } = {}) {
   const ignored = ignore.map(toRegex);
   const skip = (key) => ignored.some((re) => re.test(key));
-  const parsed = files.map((f) => ({ name: f.name, ...parse(f.text) }));
+  const parsed = files.map((f) => ({ name: f.name, text: f.text, ...parse(f.text) }));
   const all = [...new Set(parsed.flatMap((p) => [...p.vars.keys()]))].filter((k) => !skip(k)).sort();
   const missing = parsed.map((p) => ({ file: p.name, keys: all.filter((k) => !p.vars.has(k)) }));
   // "Did you mean": a missing key that looks like a typo of a key only this file has.
@@ -80,6 +103,7 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
     if (!isTemplate(p.name) && git.tracked?.includes(p.name)) leaks.push({ file: p.name, type: 'tracked-by-git' });
     else if (!isTemplate(p.name) && git.unignored?.includes(p.name)) warnings.push({ file: p.name, type: 'not-gitignored' });
     for (const d of p.duplicates) if (!skip(d.key)) warnings.push({ file: p.name, key: d.key, type: 'duplicate', lines: d.lines });
+    for (const x of lint(p.text, today)) if (!skip(x.key)) warnings.push({ file: p.name, key: x.key, type: x.date ? `${x.type} ${x.date}` : x.type, lines: [x.line] });
     for (const line of p.invalid) warnings.push({ file: p.name, type: 'invalid-line', lines: [line] });
     // Leak detection deliberately ignores --ignore: a real secret in a template is always reported.
     for (const [key, { value, line }] of p.vars) {

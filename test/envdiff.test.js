@@ -227,3 +227,16 @@ test('scan finds env usage across languages, skips node_modules and builtins', a
   assert.ok(!r.out.includes('secretdb'));
   assert.equal(run(['--scan', '.', '--ignore', 'IMAGE_TAG'], d).code, 0);
 });
+
+test('lint: style problems and @expire, never values', async () => {
+  const { lint } = await import('../src/index.js');
+  const text = ['db_url=1', '  LEAD=1', 'TRAIL=1  ', 'SPACED = 1', 'UNQ=hello world', 'OK="hello world"',
+    '# @expire 2026-01-01', 'OLD_TOKEN=x', '# @expire 2026-12-01', 'SOON_TOKEN=x', '# @expire 2030-01-01', 'LATER=x', 'FINE=1 # comment'].join('\n');
+  assert.deepEqual(lint(text, '2026-11-21').map((x) => `${x.type}:${x.key}`), [
+    'lowercase-key:db_url', 'leading-space:LEAD', 'trailing-whitespace:TRAIL', 'space-around-equals:SPACED',
+    'unquoted-space:UNQ', 'expired:OLD_TOKEN', 'expires-soon:SOON_TOKEN',
+  ]);
+  const r = compare([{ name: '.env.example', text: '# @expire 2026-01-01\nOLD_TOKEN=' }, { name: '.env', text: 'OLD_TOKEN=x' }], { today: '2026-11-21' });
+  assert.deepEqual(r.warnings, [{ file: '.env.example', key: 'OLD_TOKEN', type: 'expired 2026-01-01', lines: [2] }]);
+  assert.equal(compare([{ name: '.env.example', text: '# @expire 2026-01-01\nOLD_TOKEN=' }, { name: '.env', text: 'OLD_TOKEN=x' }], { today: '2026-11-21', strict: true }).ok, false);
+});
