@@ -65,6 +65,19 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false }
       if (isTemplate(p.name) && looksSecret(value)) leaks.push({ file: p.name, key, type: 'secret-in-template', lines: [line] });
     }
   }
+  // Per key, one cell per file: null = missing, otherwise a group number. Same number = same value.
+  // Only equality is revealed (already implied by `different`), never the values.
+  const table = all.map((key) => {
+    const groups = [];
+    const cells = parsed.map((p) => {
+      if (!p.vars.has(key)) return null;
+      if (keysOnly) return 0;
+      const v = p.vars.get(key).value;
+      if (!groups.includes(v)) groups.push(v);
+      return groups.indexOf(v);
+    });
+    return { key, cells };
+  });
   const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !(strict && warnings.length);
-  return { files: parsed.map((p) => p.name), missing, different, warnings, leaks, ok };
+  return { files: parsed.map((p) => p.name), missing, different, warnings, leaks, table, ok };
 }
