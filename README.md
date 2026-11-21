@@ -49,9 +49,9 @@ Possible real secrets in template files:
 | `-h`, `--help` | Help |
 | `-v`, `--version` | Version |
 
-## Limitations
+## Parsing
 
-Single-line values only (no multiline values or escaped quotes yet). Open an issue if you need them.
+Follows common dotenv rules: `export` prefix, `#` comments, single/double/backtick quotes, multiline quoted values (e.g. private keys), and `\"` `\n` `\t` `\\` escapes inside double quotes. An unclosed quote is reported as an invalid line instead of swallowing the rest of the file. No variable expansion (`${VAR}`) yet.
 
 ## Security
 

@@ -1,22 +1,34 @@
-// shortcut: single-line values only (no multiline or escaped quotes); upgrade if users report it.
 const LINE = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$/;
+
+// Index of the closing quote; backslash escapes apply only inside double quotes (dotenv semantics).
+const closing = (s, q) => {
+  for (let k = 0; k < s.length; k++) {
+    if (q === '"' && s[k] === '\\') k++;
+    else if (s[k] === q) return k;
+  }
+  return -1;
+};
+const unescape = (s) => s.replace(/\\([nrt"\\])/g, (_, c) => ({ n: '\n', r: '\r', t: '\t' })[c] ?? c);
 
 export function parse(text) {
   const vars = new Map(), duplicates = [], invalid = [];
-  text.split(/\r?\n/).forEach((raw, i) => {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) return;
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('#')) continue;
     const m = line.match(LINE);
-    if (!m) return invalid.push(i + 1);
+    if (!m) { invalid.push(i + 1); continue; }
     let [, key, val] = m;
-    const q = val[0];
+    const start = i + 1, q = val[0];
     if (q === '"' || q === "'" || q === '`') {
-      const end = val.indexOf(q, 1);
-      val = end > 0 ? val.slice(1, end) : val.slice(1);
+      let body = val.slice(1), end = closing(body, q), j = i;
+      while (end < 0 && j + 1 < lines.length) { body += '\n' + lines[++j]; end = closing(body, q); }
+      if (end < 0) { invalid.push(start); val = val.slice(1); } // unclosed quote: don't swallow the rest of the file
+      else { val = body.slice(0, end); i = j; if (q === '"') val = unescape(val); }
     } else val = val.replace(/\s+#.*$/, '').trim();
-    if (vars.has(key)) duplicates.push({ key, lines: [vars.get(key).line, i + 1] });
-    vars.set(key, { value: val, line: i + 1 });
-  });
+    if (vars.has(key)) duplicates.push({ key, lines: [vars.get(key).line, start] });
+    vars.set(key, { value: val, line: start });
+  }
   return { vars, duplicates, invalid };
 }
 
