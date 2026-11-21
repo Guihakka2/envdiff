@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { basename, dirname, resolve } from 'node:path';
 import { compare } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
+import { scanCode } from '../src/scan.js';
 
 const HELP = `Usage: envdiff [<file> <file> [more files...]] [options]
 
@@ -18,6 +19,8 @@ Options:
   --table       Key x file grid: ✗ missing, same letter = same value
   --fix         Append missing keys (empty values) to the files that lack them
   --html FILE   Also write a visual HTML report (never contains values)
+  --scan DIR    Scan source code in DIR: keys used in code but not defined fail,
+                defined keys never used in code warn (e.g. --scan .)
   --json        Machine-readable output
   -h, --help    Show help
   -v, --version Show version
@@ -28,7 +31,7 @@ let args;
 try {
   args = parseArgs({ allowPositionals: true, options: {
     'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
-    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' },
+    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
 } catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
 const { values: o, positionals } = args;
@@ -58,7 +61,7 @@ for (const { name } of files) {
   if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(name);
   else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(name);
 }
-const opts = { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict, git };
+const opts = { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict, git, used: o.scan === undefined ? null : scanCode(resolve(o.scan)) };
 let r = compare(files, opts);
 const fixed = [];
 if (o.fix) {
@@ -99,6 +102,7 @@ if (o.table) {
 for (const f of fixed) out.push(c(32, `Added to ${f.file} (empty values):`), ...f.keys.map((k) => `  + ${k}`), '');
 const hint = (file, k) => { const s = r.suggestions.find((x) => x.file === file && x.missing === k); return s ? c(2, `  (did you mean ${s.similar}?)`) : ''; };
 for (const m of r.missing) if (m.keys.length) out.push(c(31, `Missing in ${m.file}:`), ...m.keys.map((k) => `  - ${k}${hint(m.file, k)}`), '');
+if (r.undefinedInCode.length) out.push(c(31, 'Used in code but not defined in any env file:'), ...r.undefinedInCode.map((u) => `  - ${u.key}${c(2, `  (${u.refs[0].file}:${u.refs[0].line}${u.refs.length > 1 ? ` +${u.refs.length - 1}` : ''})`)}`), '');
 if (r.different.length) out.push(c(33, 'Different values (hidden):'), ...r.different.map((k) => `  ~ ${k}`), '');
 const leakMsg = (w) => (w.type === 'tracked-by-git' ? `  ! ${w.file} is committed to git: remove it (git rm --cached) and rotate its secrets` : `  ! ${w.file}: ${w.key}${at(w)} looks like a real secret in a template file`);
 if (r.leaks.length) out.push(c(31, 'Security problems:'), ...r.leaks.map(leakMsg), '');

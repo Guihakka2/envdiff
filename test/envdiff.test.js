@@ -203,3 +203,27 @@ test('template values are placeholders: never counted as different', () => {
   assert.deepEqual(r.table, [{ key: 'A', cells: [-1, 0, 0] }]);
   assert.equal(r.ok, true);
 });
+
+test('scan finds env usage across languages, skips node_modules and builtins', async () => {
+  const { scanCode } = await import('../src/scan.js');
+  const { mkdirSync } = await import('node:fs');
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-scan-'));
+  mkdirSync(join(d, 'src')); mkdirSync(join(d, 'node_modules', 'x'), { recursive: true });
+  writeFileSync(join(d, 'src', 'a.ts'), 'const a = process.env.DATABASE_URL;\nconst b = process.env["API_KEY"];\nimport.meta.env.VITE_URL; process.env.NODE_ENV;\nconst t = `${NOT_ENV}`;');
+  writeFileSync(join(d, 'app.py'), 'os.getenv("SMTP_HOST")\nos.environ["SMTP_PORT"]');
+  writeFileSync(join(d, 'main.go'), 'os.Getenv("GO_KEY")');
+  writeFileSync(join(d, 'docker-compose.yml'), 'image: ${IMAGE_TAG:-latest}');
+  writeFileSync(join(d, 'node_modules', 'x', 'i.js'), 'process.env.FROM_DEPENDENCY');
+  const used = scanCode(d);
+  assert.deepEqual([...used.keys()].sort(), ['API_KEY', 'DATABASE_URL', 'GO_KEY', 'IMAGE_TAG', 'SMTP_HOST', 'SMTP_PORT', 'VITE_URL']);
+  assert.deepEqual(used.get('DATABASE_URL'), [{ file: 'src/a.ts', line: 1 }]);
+
+  writeFileSync(join(d, '.env.example'), 'DATABASE_URL=\nAPI_KEY=\nVITE_URL=\nSMTP_HOST=\nSMTP_PORT=\nGO_KEY=\nOLD_FLAG=\n');
+  writeFileSync(join(d, '.env'), 'DATABASE_URL=secretdb\nAPI_KEY=k\nVITE_URL=u\nSMTP_HOST=h\nSMTP_PORT=1\nGO_KEY=g\nOLD_FLAG=1\n');
+  const r = run(['--scan', '.'], d);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Used in code but not defined in any env file:\n  - IMAGE_TAG  \(docker-compose\.yml:1\)/);
+  assert.match(r.out, /unused OLD_FLAG/);
+  assert.ok(!r.out.includes('secretdb'));
+  assert.equal(run(['--scan', '.', '--ignore', 'IMAGE_TAG'], d).code, 0);
+});

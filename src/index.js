@@ -56,7 +56,7 @@ const distance = (a, b) => {
 };
 
 // git: { tracked: [file names committed to git], unignored: [file names not covered by .gitignore] }
-export function compare(files, { keysOnly = false, ignore = [], strict = false, git = {} } = {}) {
+export function compare(files, { keysOnly = false, ignore = [], strict = false, git = {}, used = null } = {}) {
   const ignored = ignore.map(toRegex);
   const skip = (key) => ignored.some((re) => re.test(key));
   const parsed = files.map((f) => ({ name: f.name, ...parse(f.text) }));
@@ -101,6 +101,9 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
     });
     return { key, cells };
   });
-  const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !(strict && warnings.length);
-  return { files: parsed.map((p) => p.name), missing, suggestions, different, warnings, leaks, table, ok };
+  // used: Map<key, [{file, line}]> from scanCode(). Code needs a key no env file defines -> fail; defined but unused -> warn.
+  const undefinedInCode = used ? [...used].filter(([k]) => !skip(k) && !parsed.some((p) => p.vars.has(k))).map(([key, refs]) => ({ key, refs })).sort((a, b) => a.key.localeCompare(b.key)) : [];
+  if (used) for (const key of all) if (!used.has(key)) warnings.push({ file: parsed.find((p) => p.vars.has(key)).name, key, type: 'unused' });
+  const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !undefinedInCode.length && !(strict && warnings.length);
+  return { files: parsed.map((p) => p.name), missing, suggestions, different, undefinedInCode, warnings, leaks, table, ok };
 }

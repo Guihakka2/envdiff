@@ -72,6 +72,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
 <div class="pill ${r.ok ? 'good' : 'bad'}">${r.ok ? '✓ In sync' : '✗ Not in sync'}</div></header>
 <div class="stats">${stats.map(([l, n, c]) => `<div class="stat ${c}"><div class="label">${l}</div><div class="n">${n}</div></div>`).join('')}</div>
 ${list('Security problems', 'bad', r.leaks.map(leakText))}
+${list('Used in code but not defined in any env file', 'bad', (r.undefinedInCode || []).map((u) => `<code>${esc(u.key)}</code> — ${esc(u.refs[0].file)}:${u.refs[0].line}${u.refs.length > 1 ? ` (+${u.refs.length - 1} more)` : ''}`))}
 <section class="panel"><h2>Keys by environment</h2>
 <div class="tools"><input type="search" id="q" placeholder="Filter keys…" aria-label="Filter keys">
 <button type="button" id="only" aria-pressed="false">Only problems (${problemKeys.size})</button></div>
