@@ -68,6 +68,17 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 { "files": [".env.example", ".env.staging", ".env.production"], "ignore": ["APP_URL"], "strict": true, "scan": "." }
 ```
 
+## Adopting in a big project (baseline)
+
+Already have dozens of undocumented keys? Record them once and only fail on **new** problems:
+
+```bash
+npx @guihakka2/envdiff --scan . --baseline   # writes .envdiff-baseline.json (commit it)
+npx @guihakka2/envdiff --scan .              # from now on: only new problems fail
+```
+
+The baseline stores key names only, never values. **Security problems are never baselined**: a real secret in `.env.example` or a committed `.env` always shows and always fails. `--ignore-baseline` shows everything again; delete entries from the file as you fix them.
+
 ## Visual report
 
 ```bash
@@ -90,6 +101,8 @@ A side-by-side, editor-style view: one column per env file with line numbers, re
 | `--fix` | Appends missing keys with **empty** values to the files that lack them. Never copies values, never edits existing lines. |
 | `--html FILE` | Also writes a visual HTML report (never contains values) |
 | `--open` | Opens the visual report in your browser |
+| `--baseline` | Save current problems to `.envdiff-baseline.json`; later runs only report new ones |
+| `--ignore-baseline` | Show every problem, including baselined ones |
 | `--scan DIR` | Compare with env keys used in source code (`--scan .`) |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |

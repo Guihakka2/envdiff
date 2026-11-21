@@ -167,3 +167,24 @@ export function compare(files, { keysOnly = false, ignore = [], strict = false, 
   const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !undefinedInCode.length && !(strict && warnings.length);
   return { files: parsed.map((p) => p.name), missing, suggestions, different, undefinedInCode, warnings, leaks, table, ok };
 }
+
+// Baseline: stable ids for known problems (no values, no line numbers so edits don't churn).
+// Security problems (leaks, committed .env) are never baselined: they always show and fail.
+export const problemIds = (r) => [
+  ...r.missing.flatMap((m) => m.keys.map((k) => `missing|${m.file}|${k}`)),
+  ...r.different.map((k) => `different|${k}`),
+  ...(r.undefinedInCode || []).map((u) => `undefined|${u.key}`),
+  ...r.warnings.filter((w) => w.type !== 'not-gitignored').map((w) => `warning|${w.file}|${w.type}|${w.key ?? ''}`),
+].sort();
+
+export function applyBaseline(r, known, { strict = false } = {}) {
+  const set = new Set(known);
+  const keep = (id) => !set.has(id);
+  const missing = r.missing.map((m) => ({ ...m, keys: m.keys.filter((k) => keep(`missing|${m.file}|${k}`)) }));
+  const different = r.different.filter((k) => keep(`different|${k}`));
+  const undefinedInCode = (r.undefinedInCode || []).filter((u) => keep(`undefined|${u.key}`));
+  const warnings = r.warnings.filter((w) => w.type === 'not-gitignored' || keep(`warning|${w.file}|${w.type}|${w.key ?? ''}`));
+  const baselined = problemIds(r).length - problemIds({ missing, different, undefinedInCode, warnings }).length;
+  const ok = missing.every((m) => !m.keys.length) && !different.length && !r.leaks.length && !undefinedInCode.length && !(strict && warnings.length);
+  return { ...r, missing, different, undefinedInCode, warnings, baselined, ok };
+}

@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { spawnSync, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve, join, relative, isAbsolute } from 'node:path';
-import { compare, printable, distance } from '../src/index.js';
+import { compare, printable, distance, problemIds, applyBaseline } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
 import { scanCode } from '../src/scan.js';
 
@@ -24,6 +24,9 @@ Options:
   --open        Open the visual report in your browser (temp file if no --html)
   --scan DIR    Scan source code in DIR: keys used in code but not defined fail,
                 defined keys never used in code warn (e.g. --scan .)
+  --baseline    Save current problems to .envdiff-baseline.json; later runs only
+                report new ones (security problems are never baselined)
+  --ignore-baseline  Show every problem, even ones in the baseline
   --json        Machine-readable output
   -h, --help    Show help
   -v, --version Show version
@@ -33,6 +36,7 @@ Exit codes: 0 = in sync, 1 = differences or leaked secret, 2 = usage error`;
 const OPTIONS = {
   'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
   table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' }, open: { type: 'boolean' },
+  baseline: { type: 'boolean' }, 'ignore-baseline': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } };
 let args;
 try {
@@ -118,6 +122,22 @@ if (o.fix) {
   }
   r = compare(files, opts);
 }
+// Baseline: known problems recorded once, so big projects can adopt envdiff and only fail on new ones.
+const BASELINE = '.envdiff-baseline.json';
+if (o.baseline) {
+  const ids = problemIds(r);
+  writeFileSync(BASELINE, JSON.stringify({ version: 1, note: 'Known envdiff problems: key names only, never values. Security problems are never stored here.', problems: ids }, null, 2) + '\n');
+  console.error(`envdiff: saved ${ids.length} known problem(s) to ${BASELINE}; future runs only report new ones`);
+}
+if (!o['ignore-baseline']) {
+  let b;
+  try { b = JSON.parse(readFileSync(BASELINE, 'utf8')); }
+  catch (e) { if (e.code !== 'ENOENT') { console.error(`envdiff: invalid ${BASELINE}: ${e.message}`); process.exit(2); } }
+  if (b) {
+    if (!Array.isArray(b.problems) || !b.problems.every((s) => typeof s === 'string')) { console.error(`envdiff: ${BASELINE} "problems" must be a list of strings`); process.exit(2); }
+    r = applyBaseline(r, b.problems, { strict: o.strict });
+  }
+}
 // --open without --html: write the report to a temp file (it never contains values) and open it.
 if (o.open && !o.html) o.html = join(mkdtempSync(join(tmpdir(), 'envdiff-')), 'report.html'); // private new dir: no symlink tricks
 if (o.html) {
@@ -157,6 +177,7 @@ if (r.different.length) out.push(c(33, 'Different values (hidden):'), ...r.diffe
 const leakMsg = (w) => (w.type === 'tracked-by-git' ? `  ! ${w.file} is committed to git: remove it (git rm --cached) and rotate its secrets` : `  ! ${w.file}: ${w.key}${at(w)} looks like a real secret in a template file`);
 if (r.leaks.length) out.push(c(31, 'Security problems:'), ...r.leaks.map(leakMsg), '');
 if (r.warnings.length) out.push(c(36, 'Warnings:'), ...r.warnings.map((w) => `  ! ${w.file}: ${w.type}${w.key ? ' ' + w.key : ''}${at(w)}`), '');
+if (r.baselined) out.push(c(2, `${r.baselined} known problem(s) hidden by ${BASELINE} (--ignore-baseline shows them)`));
 out.push(r.ok ? c(32, '✓ In sync') : c(31, '✗ Not in sync'));
 console.log(out.join('\n'));
 process.exit(r.ok ? 0 : 1);
