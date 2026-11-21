@@ -2,21 +2,22 @@
 
 Goal: envdiff becomes the default safe way to check `.env` drift locally and in CI.
 
-## v0.1.1 — trusted release pipeline (this week)
-- [ ] Configure npm Trusted Publisher + "disallow tokens" on npmjs.com
-- [ ] Release 0.1.1 from GitHub Actions and verify the provenance badge on npm
+## v0.1.1 — trusted release pipeline ✅
+- [x] Configure npm Trusted Publisher + "disallow tokens" on npmjs.com
+- [x] Release 0.1.1 from GitHub Actions and verify the provenance badge on npm
 
-## v0.2 — zero-config + CI (≈2 weeks)
-- [ ] **Zero-arg mode**: `envdiff` alone compares `.env.example` with `.env` in the current folder
-- [ ] **Multiline values and escaped quotes** (current known limit)
-- [ ] `--ignore KEY,PREFIX_*` to skip keys that are expected to differ
-- [ ] `--strict`: warnings (duplicate, empty, invalid line) also fail
-- [ ] **GitHub Action**: `uses: Guihakka2/envdiff@v1` with job summary output
-- [ ] More secret patterns (GitLab, npm, Azure, JWT-looking values), each with a test
+## v0.2 — zero-config + CI ✅
+- [x] **Zero-arg mode**: `envdiff` alone compares `.env.example` with `.env` in the current folder
+- [x] **Multiline values and escaped quotes** (current known limit)
+- [x] `--ignore KEY,PREFIX_*` to skip keys that are expected to differ
+- [x] `--strict`: warnings (duplicate, empty, invalid line) also fail
+- [x] **GitHub Action**: `uses: Guihakka2/envdiff@v1` with job summary output
+- [x] More secret patterns (GitLab, npm, Azure, JWT-looking values), each with a test
 
 ## Launch (after v0.2)
-- [ ] README: demo GIF, comparison with alternatives (honest, verified)
-- [ ] README.pt-BR.md and README.ja.md
+- [x] README: comparison with alternatives (honest, verified)
+- [ ] README: demo GIF
+- [x] README.pt-BR.md and README.ja.md
 - [ ] Post: Show HN, r/devops, r/node, dev.to (EN) · Zenn, Qiita (JA) · TabNews (PT)
 - [ ] Submit to awesome-dotenv / awesome-devops style lists
 

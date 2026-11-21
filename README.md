@@ -1,5 +1,9 @@
 # envdiff
 
+[![npm](https://img.shields.io/npm/v/@guihakka2/envdiff)](https://www.npmjs.com/package/@guihakka2/envdiff) [![CI](https://github.com/Guihakka2/envdiff/actions/workflows/ci.yml/badge.svg)](https://github.com/Guihakka2/envdiff/actions/workflows/ci.yml)
+
+English · [Português](README.pt-BR.md) · [日本語](README.ja.md)
+
 Compare `.env` files across environments (dev, staging, prod, `.env.example`) — **without ever printing secret values**.
 
 Safe to run in CI logs, screenshots and pull requests: values are compared in memory, only key names are shown.
@@ -61,6 +65,15 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 ## Parsing
 
 Follows common dotenv rules: `export` prefix, `#` comments, single/double/backtick quotes, multiline quoted values (e.g. private keys), and `\"` `\n` `\t` `\\` escapes inside double quotes. An unclosed quote is reported as an invalid line instead of swallowing the rest of the file. No variable expansion (`${VAR}`) yet.
+
+## Alternatives
+
+Good tools already exist; pick the one that fits:
+
+- [dotenv-linter](https://github.com/dotenv-linter/dotenv-linter) (Rust) — lints and auto-fixes `.env` files, and has a command to compare key sets between files.
+- [dotenv-diff](https://github.com/Chrilleweb/dotenv-diff) (Node) — scans your codebase for env variable usage and checks it against `.env` / `.env.example`; also has a `--compare` mode.
+
+envdiff focuses on one job: comparing **2 or more** env files where **no value ever appears in the output**, plus catching real secrets committed to template files. Zero dependencies, one GitHub Action line.
 
 ## Security
 
