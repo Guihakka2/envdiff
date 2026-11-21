@@ -43,7 +43,7 @@ const isTemplate = (name) => /example|sample|template|dist/i.test(name);
 // Glob patterns (only * is special) -> anchored regexes.
 const toRegex = (glob) => new RegExp('^' + glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
 
-export function compare(files, { keysOnly = false, ignore = [] } = {}) {
+export function compare(files, { keysOnly = false, ignore = [], strict = false } = {}) {
   const ignored = ignore.map(toRegex);
   const skip = (key) => ignored.some((re) => re.test(key));
   const parsed = files.map((f) => ({ name: f.name, ...parse(f.text) }));
@@ -63,6 +63,6 @@ export function compare(files, { keysOnly = false, ignore = [] } = {}) {
       if (isTemplate(p.name) && looksSecret(value)) leaks.push({ file: p.name, key, type: 'secret-in-template', lines: [line] });
     }
   }
-  const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length;
+  const ok = missing.every((m) => !m.keys.length) && !different.length && !leaks.length && !(strict && warnings.length);
   return { files: parsed.map((p) => p.name), missing, different, warnings, leaks, ok };
 }

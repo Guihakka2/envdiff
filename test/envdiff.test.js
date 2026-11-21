@@ -69,6 +69,16 @@ test('ignore skips keys by name and * wildcard, but never hides leaks', () => {
   assert.equal(run(['a.env', 'b.env', '--ignore', 'X'], d).code, 1);
 });
 
+test('strict turns warnings into failures', () => {
+  const files = [{ name: 'a.env', text: 'A=1\nA=1' }, { name: 'b.env', text: 'A=1' }];
+  assert.equal(compare(files).ok, true);
+  assert.equal(compare(files, { strict: true }).ok, false);
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, 'a.env'), 'A=\n');
+  assert.equal(run(['a.env', 'a.env'], d).code, 0);
+  assert.equal(run(['a.env', 'a.env', '--strict'], d).code, 1);
+});
+
 test('empty values warn in real env files but not in templates', () => {
   const r = compare([{ name: '.env.example', text: 'A=' }, { name: '.env', text: 'A=' }]);
   assert.deepEqual(r.warnings.map((w) => w.file), ['.env']);
