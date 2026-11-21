@@ -1,7 +1,7 @@
 const LINE = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$/;
 
-// [index of the closing quote or -1, where to resume]. Resuming keeps multiline parsing linear even
-// when a quote is never closed. Backslash escapes apply only inside double quotes (dotenv semantics).
+// [index of the closing quote or -1, where scanning stopped].
+// Backslash escapes apply only inside double quotes (dotenv semantics).
 const closing = (s, q, from = 0) => {
   let k = from;
   for (; k < s.length; k++) {
@@ -17,6 +17,7 @@ const unescape = (s) => s.replace(/\\([nrt"\\])/g, (_, c) => ({ n: '\n', r: '\r'
 
 export function parse(text) {
   const vars = new Map(), duplicates = [], invalid = [];
+  const noCloseFrom = {}; // quote char -> first line index from which no closing quote exists (hostile files stay linear)
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -26,10 +27,14 @@ export function parse(text) {
     let [, key, val] = m;
     const start = i + 1, q = val[0];
     if (q === '"' || q === "'" || q === '`') {
-      let body = val.slice(1), [end, at] = closing(body, q), j = i;
-      while (end < 0 && j + 1 < lines.length) { body += '\n' + lines[++j]; [end, at] = closing(body, q, at); }
-      if (end < 0) { invalid.push(start); val = val.slice(1); } // unclosed quote: don't swallow the rest of the file
-      else { val = body.slice(0, end); i = j; if (q === '"') val = unescape(val); }
+      // Search each line on its own and join once: linear even if the quote is never closed.
+      // (A backslash at a line end only escapes the newline, so lines can be scanned independently.)
+      const parts = [val.slice(1)];
+      let [end] = closing(parts[0], q), j = i;
+      if (end < 0 && noCloseFrom[q] !== undefined && i >= noCloseFrom[q]) j = lines.length; // known: never closes
+      while (end < 0 && j + 1 < lines.length) { parts.push(lines[++j]); [end] = closing(parts[parts.length - 1], q); }
+      if (end < 0) { noCloseFrom[q] = Math.min(noCloseFrom[q] ?? i, i); invalid.push(start); val = val.slice(1); } // unclosed quote: don't swallow the rest of the file
+      else { parts[parts.length - 1] = parts[parts.length - 1].slice(0, end); val = parts.join('\n'); i = j; if (q === '"') val = unescape(val); }
     } else val = val.replace(/\s+#.*$/, '').trim();
     if (vars.has(key)) duplicates.push({ key, lines: [vars.get(key).line, start] });
     vars.set(key, { value: val, line: start });

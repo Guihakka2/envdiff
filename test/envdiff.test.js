@@ -272,7 +272,11 @@ test('security: control chars stripped, linear parse on unclosed quote, fast sug
   assert.ok(Date.now() - t < 2000, `parse took ${Date.now() - t}ms`);
   assert.deepEqual(p.invalid, [1]);
   assert.equal(p.vars.get('X').value, '1');
-
+  t = Date.now();
+  const hostile = parse('K="x\n'.repeat(30000));
+  assert.ok(Date.now() - t < 2000, `hostile parse took ${Date.now() - t}ms`);
+  assert.equal(hostile.invalid.length, 30000);
+  assert.ok(hostile.vars.size > 0);
   const many = (pre) => Array.from({ length: 3000 }, (_, i) => `${pre}_${i}=1`).join('\n');
   t = Date.now();
   compare([{ name: 'a', text: many('ALPHA_KEY') }, { name: 'b', text: many('BETA_KEY') }]);
