@@ -1,0 +1,29 @@
+name: envdiff
+description: Compare .env files across environments without ever printing secret values.
+author: Guihakka2
+branding: { icon: lock, color: green }
+inputs:
+  files:
+    description: "Files to compare, space-separated. Empty = .env.example vs .env (keys only)."
+    required: false
+    default: ""
+  args:
+    description: "Extra flags, e.g. --keys-only --ignore APP_URL,DEBUG_* --strict"
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    # Runs the code from this exact action ref (no npx download). Inputs go through env, never
+    # interpolated into the script, so they can't inject shell commands.
+    - shell: bash
+      env:
+        ENVDIFF_FILES: ${{ inputs.files }}
+        ENVDIFF_ARGS: ${{ inputs.args }}
+        ENVDIFF_BIN: ${{ github.action_path }}/bin/envdiff.js
+      run: |
+        set -f +e
+        out=$(node "$ENVDIFF_BIN" $ENVDIFF_FILES $ENVDIFF_ARGS 2>&1); code=$?
+        echo "$out"
+        { echo '### envdiff'; echo '```'; echo "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        exit $code
