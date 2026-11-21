@@ -37,8 +37,15 @@ Possible real secrets in template files:
 ## Use in CI (GitHub Actions)
 
 ```yaml
-- run: npx @guihakka2/envdiff .env.example .env.ci --keys-only
+- uses: Guihakka2/envdiff@v1
+  with:
+    files: .env.example .env.ci   # empty = .env.example vs .env
+    args: --keys-only --strict
 ```
+
+The report (key names only) is also written to the job summary. Needs Node 20+ on the runner (GitHub-hosted runners have it). Pin to a commit SHA for maximum supply-chain safety.
+
+Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 
 ## Options
 
