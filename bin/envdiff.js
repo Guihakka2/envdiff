@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { compare } from '../src/index.js';
 
-const HELP = `Usage: envdiff <file> <file> [more files...] [options]
+const HELP = `Usage: envdiff [<file> <file> [more files...]] [options]
 
 Compares keys across .env files. Values are compared but NEVER printed.
+With no files, compares .env.example and .env in the current folder (keys only).
 
 Options:
   --keys-only   Only compare keys (useful against .env.example)
@@ -24,13 +25,19 @@ try {
 const { values: o, positionals } = args;
 if (o.help) { console.log(HELP); process.exit(0); }
 if (o.version) { console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version); process.exit(0); }
-if (positionals.length < 2) { console.error(HELP); process.exit(2); }
+const zeroArg = positionals.length === 0;
+const names = zeroArg ? ['.env.example', '.env'] : positionals;
+if (names.length < 2) { console.error(HELP); process.exit(2); }
 
 let files;
-try { files = positionals.map((name) => ({ name, text: readFileSync(name, 'utf8') })); }
-catch (e) { console.error(`envdiff: cannot read ${e.path}: ${e.code}`); process.exit(2); }
+try { files = names.map((name) => ({ name, text: readFileSync(name, 'utf8') })); }
+catch (e) {
+  console.error(`envdiff: cannot read ${e.path}: ${e.code}`);
+  if (zeroArg) console.error('With no arguments envdiff compares .env.example and .env in the current folder.\nRun envdiff --help for usage.');
+  process.exit(2);
+}
 
-const r = compare(files, { keysOnly: o['keys-only'] });
+const r = compare(files, { keysOnly: o['keys-only'] || zeroArg });
 if (o.json) { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }
 
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
