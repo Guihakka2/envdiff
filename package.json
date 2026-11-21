@@ -15,7 +15,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "demo": "node scripts/demo.mjs"
   },
   "keywords": [
     "dotenv",
