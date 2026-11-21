@@ -5,7 +5,7 @@ import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse, compare } from '../src/index.js';
+import { parse, compare, looksSecret } from '../src/index.js';
 
 const bin = fileURLToPath(new URL('../bin/envdiff.js', import.meta.url));
 const run = (args, cwd) => {
@@ -67,6 +67,18 @@ test('ignore skips keys by name and * wildcard, but never hides leaks', () => {
   assert.equal(run(['a.env', 'b.env', '--ignore', 'X, Y'], d).code, 0);
   assert.equal(run(['a.env', 'b.env', '--ignore', 'X', '--ignore', 'Y'], d).code, 0);
   assert.equal(run(['a.env', 'b.env', '--ignore', 'X'], d).code, 1);
+});
+
+test('secret patterns: GitLab, npm, Azure, JWT (positive and negative)', () => {
+  // Built from parts so repo secret scanners don't flag these fake fixtures.
+  const yes = [
+    'glpat-' + 'a'.repeat(20), 'npm_' + 'A1'.repeat(18),
+    'DefaultEndpointsProtocol=https;AccountName=x;AccountKey=' + 'Ab1+'.repeat(22) + '==',
+    'eyJ' + 'hbGciOiJIUzI1' + '.eyJ' + 'zdWIiOiIxMjM0' + '.' + 'SflKxwRJSMeKKF2QT4fw',
+  ];
+  const no = ['glpat-short', 'npm_tooshort', 'AccountKey=<your-key>', 'eyJhbGciOi', 'changeme', ''];
+  for (const v of yes) assert.equal(looksSecret(v), true, v);
+  for (const v of no) assert.equal(looksSecret(v), false, v);
 });
 
 test('strict turns warnings into failures', () => {

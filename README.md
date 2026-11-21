@@ -29,7 +29,7 @@ Possible real secrets in template files:
 
 - Missing / extra keys across **2 or more** files
 - Changed values, shown only as key names
-- Detects real-looking secrets (AWS, GitHub, OpenAI, Stripe, Slack, Google, private keys) committed in `.example` / `.sample` / `.template` files
+- Detects real-looking secrets (AWS, GitHub, GitLab, npm, OpenAI, Stripe, Slack, Google, Azure, JWT, private keys) committed in `.example` / `.sample` / `.template` files
 - Duplicate keys, empty values, malformed lines
 - `--json` output and exit codes for CI: `0` in sync, `1` differences, `2` usage error
 - Zero dependencies, runs offline, nothing is sent anywhere

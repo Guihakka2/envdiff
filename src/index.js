@@ -35,6 +35,8 @@ export function parse(text) {
 const SECRET_PATTERNS = [
   /AKIA[0-9A-Z]{16}/, /\bgh[pousr]_[A-Za-z0-9]{30,}/, /github_pat_\w{20,}/, /\bsk-[A-Za-z0-9_-]{20,}/,
   /\b[sr]k_live_\w{10,}/, /\bxox[abprs]-[\w-]{10,}/, /-----BEGIN [A-Z ]*PRIVATE KEY/, /\bAIza[\w-]{35}/,
+  /\bglpat-[\w-]{20,}/, /\bnpm_[A-Za-z0-9]{36}\b/, /AccountKey=[A-Za-z0-9+/]{80,}={0,2}/,
+  /\beyJ[\w-]{10,}\.eyJ[\w-]{10,}\.[\w-]{10,}/,
 ];
 export const looksSecret = (v) => SECRET_PATTERNS.some((re) => re.test(v));
 const isTemplate = (name) => /example|sample|template|dist/i.test(name);
