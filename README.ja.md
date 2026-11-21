@@ -9,7 +9,7 @@ CI のログ、スクリーンショット、プルリクエストにそのま�
 <p align="center"><img src="docs/demo.svg" alt="envdiff demo" width="760"></p>
 
 ```bash
-npx @guihakka2/envdiff            # 現在のフォルダの .env.example と .env を比較
+npx @guihakka2/envdiff            # 現在のフォルダのすべての .env* を比較
 npx @guihakka2/envdiff .env .env.example --keys-only
 npx @guihakka2/envdiff .env.staging .env.production
 ```
@@ -22,6 +22,9 @@ npx @guihakka2/envdiff .env.staging .env.production
 - 重複キー、空の値、不正な行
 - **Git の安全確認**：本物の `.env` がコミットされていれば失敗、`.gitignore` になければ警告
 - `DATABSE_URL` のような打ち間違いに **did you mean?** で候補を表示
+- **コードスキャン**（`--scan .`）：コードで使われているのに未定義のキー、使われていないキーを検出
+- **Lint** と `# @expire 2027-03-31` による**期限切れ警告**
+- **設定不要**：引数なしでフォルダ内のすべての `.env*` を比較。`.envdiffrc.json` で既定値も設定可能
 - `--json` 出力と CI 用の終了コード：`0` 一致、`1` 差分あり、`2` 使い方の誤り
 - 依存パッケージなし、オフラインで動作、データはどこにも送信されません
 
@@ -44,6 +47,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--table` | キー × ファイルの表：`✗` 不足、同じ文字 = 同じ値（値は表示しません） |
 | `--fix` | 不足しているキーを**空の値**で追記。値はコピーしません。 |
 | `--html FILE` | 見やすい HTML レポートも出力（値は含まれません） |
+| `--scan DIR` | ソースコードで使われている環境変数と比較（`--scan .`） |
 | `--json` | 機械可読なレポート（値は含まれません） |
 
 詳しいドキュメントは[英語版 README](README.md) を参照してください。ライセンス：MIT

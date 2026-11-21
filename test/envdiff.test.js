@@ -203,3 +203,61 @@ test('template values are placeholders: never counted as different', () => {
   assert.deepEqual(r.table, [{ key: 'A', cells: [-1, 0, 0] }]);
   assert.equal(r.ok, true);
 });
+
+test('scan finds env usage across languages, skips node_modules and builtins', async () => {
+  const { scanCode } = await import('../src/scan.js');
+  const { mkdirSync } = await import('node:fs');
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-scan-'));
+  mkdirSync(join(d, 'src')); mkdirSync(join(d, 'node_modules', 'x'), { recursive: true });
+  writeFileSync(join(d, 'src', 'a.ts'), 'const a = process.env.DATABASE_URL;\nconst b = process.env["API_KEY"];\nimport.meta.env.VITE_URL; process.env.NODE_ENV;\nconst t = `${NOT_ENV}`;');
+  writeFileSync(join(d, 'app.py'), 'os.getenv("SMTP_HOST")\nos.environ["SMTP_PORT"]');
+  writeFileSync(join(d, 'main.go'), 'os.Getenv("GO_KEY")');
+  writeFileSync(join(d, 'docker-compose.yml'), 'image: ${IMAGE_TAG:-latest}');
+  writeFileSync(join(d, 'node_modules', 'x', 'i.js'), 'process.env.FROM_DEPENDENCY');
+  const used = scanCode(d);
+  assert.deepEqual([...used.keys()].sort(), ['API_KEY', 'DATABASE_URL', 'GO_KEY', 'IMAGE_TAG', 'SMTP_HOST', 'SMTP_PORT', 'VITE_URL']);
+  assert.deepEqual(used.get('DATABASE_URL'), [{ file: 'src/a.ts', line: 1 }]);
+
+  writeFileSync(join(d, '.env.example'), 'DATABASE_URL=\nAPI_KEY=\nVITE_URL=\nSMTP_HOST=\nSMTP_PORT=\nGO_KEY=\nOLD_FLAG=\n');
+  writeFileSync(join(d, '.env'), 'DATABASE_URL=secretdb\nAPI_KEY=k\nVITE_URL=u\nSMTP_HOST=h\nSMTP_PORT=1\nGO_KEY=g\nOLD_FLAG=1\n');
+  const r = run(['--scan', '.'], d);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /Used in code but not defined in any env file:\n  - IMAGE_TAG  \(docker-compose\.yml:1\)/);
+  assert.match(r.out, /unused OLD_FLAG/);
+  assert.ok(!r.out.includes('secretdb'));
+  assert.equal(run(['--scan', '.', '--ignore', 'IMAGE_TAG'], d).code, 0);
+});
+
+test('lint: style problems and @expire, never values', async () => {
+  const { lint } = await import('../src/index.js');
+  const text = ['db_url=1', '  LEAD=1', 'TRAIL=1  ', 'SPACED = 1', 'UNQ=hello world', 'OK="hello world"',
+    '# @expire 2026-01-01', 'OLD_TOKEN=x', '# @expire 2026-12-01', 'SOON_TOKEN=x', '# @expire 2030-01-01', 'LATER=x', 'FINE=1 # comment'].join('\n');
+  assert.deepEqual(lint(text, '2026-11-21').map((x) => `${x.type}:${x.key}`), [
+    'lowercase-key:db_url', 'leading-space:LEAD', 'trailing-whitespace:TRAIL', 'space-around-equals:SPACED',
+    'unquoted-space:UNQ', 'expired:OLD_TOKEN', 'expires-soon:SOON_TOKEN',
+  ]);
+  const r = compare([{ name: '.env.example', text: '# @expire 2026-01-01\nOLD_TOKEN=' }, { name: '.env', text: 'OLD_TOKEN=x' }], { today: '2026-11-21' });
+  assert.deepEqual(r.warnings, [{ file: '.env.example', key: 'OLD_TOKEN', type: 'expired 2026-01-01', lines: [2] }]);
+  assert.equal(compare([{ name: '.env.example', text: '# @expire 2026-01-01\nOLD_TOKEN=' }, { name: '.env', text: 'OLD_TOKEN=x' }], { today: '2026-11-21', strict: true }).ok, false);
+});
+
+test('no args: discovers every .env* file; .envdiffrc.json sets files/ignore/strict', () => {
+  const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
+  writeFileSync(join(d, '.env.example'), 'A=\nB=\n');
+  writeFileSync(join(d, '.env'), 'A=1\nB=1\n');
+  writeFileSync(join(d, '.env.production'), 'A=2\n');
+  writeFileSync(join(d, '.env.bak'), 'IGNORED_BACKUP=1\n');
+  const r = run([], d);
+  assert.match(r.out, /envdiff  \.env\.example  vs  \.env  vs  \.env\.production/);
+  assert.match(r.out, /Missing in \.env\.production:\n  - B/);
+  assert.ok(!r.out.includes('IGNORED_BACKUP'));
+  assert.equal(r.code, 1);
+
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ files: ['.env.example', '.env'], ignore: ['A'] }));
+  assert.equal(run([], d).code, 0);
+  writeFileSync(join(d, '.envdiffrc.json'), JSON.stringify({ files: ['.env.example', '.env'], strict: true }));
+  writeFileSync(join(d, '.env'), 'A=1\nB=\n');
+  assert.equal(run([], d).code, 1); // empty B is a warning; strict from config makes it fail
+  writeFileSync(join(d, '.envdiffrc.json'), '{"ignore": "A"}');
+  assert.equal(run([], d).code, 2);
+});

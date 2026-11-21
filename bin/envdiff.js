@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-import { readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, appendFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, resolve } from 'node:path';
 import { compare } from '../src/index.js';
 import { renderHtml } from '../src/html.js';
+import { scanCode } from '../src/scan.js';
 
 const HELP = `Usage: envdiff [<file> <file> [more files...]] [options]
 
 Compares keys across .env files. Values are compared but NEVER printed.
-With no files, compares .env.example and .env in the current folder (keys only).
+With no files, compares every .env* file in the current folder (or the "files" in
+.envdiffrc.json). Template files (.env.example…) only count for key presence.
 
 Options:
   --keys-only   Only compare keys (useful against .env.example)
@@ -18,6 +20,8 @@ Options:
   --table       Key x file grid: ✗ missing, same letter = same value
   --fix         Append missing keys (empty values) to the files that lack them
   --html FILE   Also write a visual HTML report (never contains values)
+  --scan DIR    Scan source code in DIR: keys used in code but not defined fail,
+                defined keys never used in code warn (e.g. --scan .)
   --json        Machine-readable output
   -h, --help    Show help
   -v, --version Show version
@@ -28,25 +32,43 @@ let args;
 try {
   args = parseArgs({ allowPositionals: true, options: {
     'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
-    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' },
+    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
 } catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
 const { values: o, positionals } = args;
 if (o.help) { console.log(HELP); process.exit(0); }
 if (o.version) { console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version); process.exit(0); }
-const zeroArg = positionals.length === 0;
-const names = zeroArg ? ['.env.example', '.env'] : positionals;
-if (names.length < 2) { console.error(HELP); process.exit(2); }
+// Optional .envdiffrc.json in the current folder; CLI flags win. Only read-only settings are allowed here.
+let rc = {};
+try { rc = JSON.parse(readFileSync('.envdiffrc.json', 'utf8')); }
+catch (e) { if (e.code !== 'ENOENT') { console.error(`envdiff: invalid .envdiffrc.json: ${e.message}`); process.exit(2); } }
+const list = (v, name) => {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || !v.every((s) => typeof s === 'string')) { console.error(`envdiff: .envdiffrc.json "${name}" must be a list of strings`); process.exit(2); }
+  return v;
+};
+const rcFiles = list(rc.files, 'files');
 
-let files;
-try { files = names.map((name) => ({ name, text: readFileSync(name, 'utf8') })); }
-catch (e) {
-  console.error(`envdiff: cannot read ${e.path}: ${e.code}`);
-  if (zeroArg) console.error('With no arguments envdiff compares .env.example and .env in the current folder.\nRun envdiff --help for usage.');
+// No files given: config files, else every .env* file here (templates first, then .env, then the rest).
+const zeroArg = positionals.length === 0 && !rcFiles.length;
+const rank = (n) => (/example|sample|template|dist/i.test(n) ? 0 : n === '.env' ? 1 : 2);
+const discovered = () => readdirSync('.').filter((n) => /^\.env(\..+)?$/.test(n) && !/(\.(bak|swp|tmp|orig|vault|keys|local\.php)|~)$/.test(n) && statSync(n).isFile())
+  .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+const names = positionals.length ? positionals : rcFiles.length ? rcFiles : discovered();
+if (names.length < 2) {
+  if (zeroArg) console.error(`envdiff: found ${names.length} .env file(s) here, need at least 2.\nWith no arguments envdiff compares all .env* files in the current folder (e.g. .env.example and .env).\nRun envdiff --help for usage.`);
+  else console.error(HELP);
   process.exit(2);
 }
 
-const ignore = (o.ignore ?? []).flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
+let files;
+try { files = names.map((name) => ({ name, text: readFileSync(name, 'utf8') })); }
+catch (e) { console.error(`envdiff: cannot read ${e.path}: ${e.code}`); process.exit(2); }
+
+const ignore = [...list(rc.ignore, 'ignore'), ...(o.ignore ?? [])].flatMap((s) => s.split(',')).map((s) => s.trim()).filter(Boolean);
+if (o.scan === undefined && typeof rc.scan === 'string') o.scan = rc.scan;
+if (o.strict === undefined && rc.strict === true) o.strict = true;
+if (o['keys-only'] === undefined && rc.keysOnly === true) o['keys-only'] = true;
 // Ask git (if installed and the file is in a repo) whether each file is committed or not ignored.
 const gitCode = (name, args) => {
   const res = spawnSync('git', [...args, '--', basename(name)], { cwd: dirname(resolve(name)), stdio: 'ignore' });
@@ -58,7 +80,7 @@ for (const { name } of files) {
   if (gitCode(name, ['ls-files', '--error-unmatch']) === 0) git.tracked.push(name);
   else if (gitCode(name, ['check-ignore', '-q']) === 1) git.unignored.push(name);
 }
-const opts = { keysOnly: o['keys-only'] || zeroArg, ignore, strict: o.strict, git };
+const opts = { keysOnly: !!o['keys-only'], ignore, strict: o.strict, git, used: o.scan === undefined ? null : scanCode(resolve(o.scan)) };
 let r = compare(files, opts);
 const fixed = [];
 if (o.fix) {
@@ -99,6 +121,7 @@ if (o.table) {
 for (const f of fixed) out.push(c(32, `Added to ${f.file} (empty values):`), ...f.keys.map((k) => `  + ${k}`), '');
 const hint = (file, k) => { const s = r.suggestions.find((x) => x.file === file && x.missing === k); return s ? c(2, `  (did you mean ${s.similar}?)`) : ''; };
 for (const m of r.missing) if (m.keys.length) out.push(c(31, `Missing in ${m.file}:`), ...m.keys.map((k) => `  - ${k}${hint(m.file, k)}`), '');
+if (r.undefinedInCode.length) out.push(c(31, 'Used in code but not defined in any env file:'), ...r.undefinedInCode.map((u) => `  - ${u.key}${c(2, `  (${u.refs[0].file}:${u.refs[0].line}${u.refs.length > 1 ? ` +${u.refs.length - 1}` : ''})`)}`), '');
 if (r.different.length) out.push(c(33, 'Different values (hidden):'), ...r.different.map((k) => `  ~ ${k}`), '');
 const leakMsg = (w) => (w.type === 'tracked-by-git' ? `  ! ${w.file} is committed to git: remove it (git rm --cached) and rotate its secrets` : `  ! ${w.file}: ${w.key}${at(w)} looks like a real secret in a template file`);
 if (r.leaks.length) out.push(c(31, 'Security problems:'), ...r.leaks.map(leakMsg), '');
