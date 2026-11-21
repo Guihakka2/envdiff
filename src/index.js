@@ -41,7 +41,7 @@ export function compare(files, { keysOnly = false } = {}) {
     for (const d of p.duplicates) warnings.push({ file: p.name, key: d.key, type: 'duplicate', lines: d.lines });
     for (const line of p.invalid) warnings.push({ file: p.name, type: 'invalid-line', lines: [line] });
     for (const [key, { value, line }] of p.vars) {
-      if (value === '') warnings.push({ file: p.name, key, type: 'empty', lines: [line] });
+      if (value === '' && !isTemplate(p.name)) warnings.push({ file: p.name, key, type: 'empty', lines: [line] });
       if (isTemplate(p.name) && looksSecret(value)) leaks.push({ file: p.name, key, type: 'secret-in-template', lines: [line] });
     }
   }

@@ -37,6 +37,11 @@ test('flags real-looking secrets only in template files', () => {
   assert.equal(compare([{ name: '.env', text: `K=${key}` }, { name: '.env.prod', text: `K=${key}` }]).leaks.length, 0);
 });
 
+test('empty values warn in real env files but not in templates', () => {
+  const r = compare([{ name: '.env.example', text: 'A=' }, { name: '.env', text: 'A=' }]);
+  assert.deepEqual(r.warnings.map((w) => w.file), ['.env']);
+});
+
 test('CLI never prints values and sets exit codes', () => {
   const d = mkdtempSync(join(tmpdir(), 'envdiff-'));
   const a = join(d, 'a.env'), b = join(d, 'b.env');
