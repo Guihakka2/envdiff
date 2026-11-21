@@ -55,6 +55,16 @@ The report (key names only) is also written to the job summary. Needs Node 20+ o
 
 Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 
+## Visual report
+
+```bash
+npx @guihakka2/envdiff .env.example .env.development .env.staging .env.production --html report.html
+```
+
+<p align="center"><img src="docs/report.jpg" alt="envdiff HTML report: key by environment grid, security problems and stats" width="760"></p>
+
+One self-contained HTML file (dark and light mode, works offline, filter + "only problems"). Like the terminal output, it **never contains values**, so it is safe to attach to CI runs or share with your team.
+
 ## Options
 
 | Flag | What it does |
@@ -64,6 +74,7 @@ Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 | `--strict` | Warnings (duplicate key, empty value, invalid line) also fail with exit code 1 |
 | `--table` | Grid of keys × files: `✗` missing, same letter = same value (values never shown) |
 | `--fix` | Appends missing keys with **empty** values to the files that lack them. Never copies values, never edits existing lines. |
+| `--html FILE` | Also writes a visual HTML report (never contains values) |
 | `--json` | Machine-readable report (never contains values) |
 | `-h`, `--help` | Help |
 | `-v`, `--version` | Version |

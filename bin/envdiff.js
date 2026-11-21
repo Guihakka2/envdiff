@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, appendFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, resolve } from 'node:path';
 import { compare } from '../src/index.js';
+import { renderHtml } from '../src/html.js';
 
 const HELP = `Usage: envdiff [<file> <file> [more files...]] [options]
 
@@ -16,6 +17,7 @@ Options:
   --strict      Warnings (duplicate, empty, invalid line) also fail
   --table       Key x file grid: ✗ missing, same letter = same value
   --fix         Append missing keys (empty values) to the files that lack them
+  --html FILE   Also write a visual HTML report (never contains values)
   --json        Machine-readable output
   -h, --help    Show help
   -v, --version Show version
@@ -26,7 +28,7 @@ let args;
 try {
   args = parseArgs({ allowPositionals: true, options: {
     'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
-    table: { type: 'boolean' }, fix: { type: 'boolean' },
+    table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } } });
 } catch (e) { console.error(e.message + '\n\n' + HELP); process.exit(2); }
 const { values: o, positionals } = args;
@@ -71,6 +73,11 @@ if (o.fix) {
   }
   r = compare(files, opts);
 }
+if (o.html) {
+  if (names.some((n) => resolve(n) === resolve(o.html))) { console.error("envdiff: --html must not overwrite an input file"); process.exit(2); }
+  try { writeFileSync(o.html, renderHtml(r, { keysOnly: opts.keysOnly })); } catch (e) { console.error(`envdiff: cannot write ${o.html}: ${e.code}`); process.exit(2); }
+  if (!o.json) console.error(`envdiff: report written to ${o.html}`);
+}
 if (o.json) { console.log(JSON.stringify(o.fix ? { ...r, fixed } : r, null, 2)); process.exit(r.ok ? 0 : 1); }
 
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -79,7 +86,7 @@ const at = (w) => (w.lines ? ` (line ${w.lines.join(', ')})` : '');
 const out = [c(1, `envdiff  ${r.files.join('  vs  ')}`), ''];
 if (o.table) {
   // Cells: ✗ missing, ✓ present (keys only), or A/B/C… where equal letters mean equal values.
-  const cell = (v) => (v === null ? '✗' : opts.keysOnly ? '✓' : String.fromCharCode(65 + v));
+  const cell = (v) => (v === null ? '✗' : opts.keysOnly || v < 0 ? '✓' : String.fromCharCode(65 + v));
   const w = [Math.max(3, ...r.table.map((t) => t.key.length)), ...r.files.map((f) => f.length)];
   const row = (cols) => cols.map((s, i) => s.padEnd(w[i])).join('  ').trimEnd();
   out.push(c(1, row(['KEY', ...r.files])));

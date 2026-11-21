@@ -43,6 +43,7 @@ npx @guihakka2/envdiff .env.staging .env.production
 | `--strict` | Avisos também falham (código 1) |
 | `--table` | Grade de chaves × arquivos: `✗` faltando, mesma letra = mesmo valor |
 | `--fix` | Adiciona as chaves que faltam com valor **vazio**. Nunca copia valores. |
+| `--html ARQUIVO` | Gera também um relatório visual em HTML (nunca contém valores) |
 | `--json` | Relatório para máquinas (nunca contém valores) |
 
 Documentação completa: [README em inglês](README.md). Licença MIT.
