@@ -109,6 +109,12 @@ npx @guihakka2/envdiff --scan . --html report.html  # or save it, e.g. as a CI a
 
 A side-by-side, editor-style view: one column per env file with line numbers, red bands for missing keys, amber bands for different values, ▲▼ (or `j` / `k`) to jump between problems, filter and "only problems". One self-contained HTML file, dark and light mode, works offline. Values show as `••••••` plus a letter (same letter = same value): the file **never contains values**, so it is safe to attach to CI runs or share with your team.
 
+## Download (no Node.js needed)
+
+Don't have Node.js? Each [release](https://github.com/Guihakka2/envdiff/releases/latest) has a standalone program for Windows (x64, ARM), macOS (Apple silicon, Intel) and Linux (x64, ARM). Download the file for your system, unzip it and run `envdiff` from a terminal, with the same options as above.
+
+The programs are built by GitHub Actions from this repository's code, with a `SHA256SUMS.txt` and a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations) (`gh attestation verify <file> -R Guihakka2/envdiff`). They are not code-signed with a paid certificate yet, so the first run shows a warning: on Windows, SmartScreen → "More info" → "Run anyway"; on macOS, run `xattr -d com.apple.quarantine envdiff` once.
+
 ## Options
 
 | Flag | What it does |

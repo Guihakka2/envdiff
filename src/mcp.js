@@ -27,7 +27,7 @@ const TOOLS = [{
 }];
 
 // The agent may only point envdiff at files inside the folder the server was started in.
-const inside = (p) => { const r = relative(process.cwd(), resolve(p)); return r === '' || (!r.startsWith('..') && !isAbsolute(r)); };
+const insideProject = (p) => { const r = relative(process.cwd(), resolve(p)); return r === '' || (!r.startsWith('..') && !isAbsolute(r)); };
 
 function checkArgs(a = {}) {
   if (typeof a !== 'object' || Array.isArray(a)) return 'arguments must be an object';
@@ -39,13 +39,14 @@ function checkArgs(a = {}) {
   if (a.scan !== undefined && typeof a.scan !== 'string') return '"scan" must be a folder path';
   for (const p of [...(a.files ?? []), ...(a.scan !== undefined ? [a.scan] : [])]) {
     if (p.startsWith('-')) return `invalid path "${p}"`;
-    if (!inside(p)) return `"${p}" is outside the project folder`;
+    if (!insideProject(p)) return `"${p}" is outside the project folder`;
   }
   return null;
 }
 
 function runEnvdiff(a) {
-  const argv = [BIN, ...(a.files ?? []), '--json'];
+  // In a standalone executable (process.argv[1] is the executable itself) there is no script path to pass.
+  const argv = [...(process.argv[1] === process.execPath ? [] : [BIN]), ...(a.files ?? []), '--json'];
   if (a.keysOnly) argv.push('--keys-only');
   if (a.strict) argv.push('--strict');
   for (const i of a.ignore ?? []) argv.push('--ignore', i);
