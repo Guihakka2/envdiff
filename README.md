@@ -60,6 +60,25 @@ The report (key names only) is also written to the job summary. Needs Node 20+ o
 
 Or without the action: `npx @guihakka2/envdiff .env.example .env.ci --keys-only`
 
+## Use with AI agents (MCP)
+
+`envdiff --mcp` runs envdiff as an [MCP](https://modelcontextprotocol.io) server, so a coding agent can check your `.env` files itself, for example before a deploy or right after it adds a new variable. It gets the same safe output as `--json`: key names, files and line numbers, **never values**.
+
+```bash
+# Claude Code
+claude mcp add envdiff -- npx -y @guihakka2/envdiff --mcp
+# Codex
+codex mcp add envdiff -- npx -y @guihakka2/envdiff --mcp
+```
+
+Other clients (VS Code, Cursor, Claude Desktop…) take the same command in their MCP config:
+
+```json
+{ "mcpServers": { "envdiff": { "command": "npx", "args": ["-y", "@guihakka2/envdiff", "--mcp"] } } }
+```
+
+The tool (`envdiff_compare`) is read-only: it can't use `--fix`, `--html` or `--baseline`, and it only reads files inside the folder the server was started in.
+
 ## Config file (optional)
 
 `.envdiffrc.json` in the project root sets defaults; CLI flags win:

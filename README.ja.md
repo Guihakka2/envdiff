@@ -37,6 +37,16 @@ npx @guihakka2/envdiff .env.staging .env.production
     args: --keys-only --strict
 ```
 
+## AI エージェントから使う（MCP）
+
+`envdiff --mcp` で envdiff を [MCP](https://modelcontextprotocol.io) サーバーとして起動できます。コーディングエージェント（Claude Code、Codex、Copilot、Cursor など）がデプロイ前や新しい変数の追加直後に `.env` を自分で確認できます。返るのは `--json` と同じ安全な出力（キー名・ファイル・行番号）で、**値は決して含まれません**。
+
+```bash
+claude mcp add envdiff -- npx -y @guihakka2/envdiff --mcp
+```
+
+ツール（`envdiff_compare`）は読み取り専用です。`--fix`・`--html`・`--baseline` は使えず、サーバーを起動したフォルダー内のファイルしか読みません。
+
 ## オプション
 
 | オプション | 説明 |

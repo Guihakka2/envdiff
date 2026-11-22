@@ -28,6 +28,8 @@ Options:
                 report new ones (security problems are never baselined)
   --ignore-baseline  Show every problem, even ones in the baseline
   --json        Machine-readable output
+  --mcp         Run as an MCP server (stdio) so AI agents can call envdiff
+                read-only, limited to the current folder
   -h, --help    Show help
   -v, --version Show version
 
@@ -36,7 +38,7 @@ Exit codes: 0 = in sync, 1 = differences or leaked secret, 2 = usage error`;
 const OPTIONS = {
   'keys-only': { type: 'boolean' }, json: { type: 'boolean' }, ignore: { type: 'string', multiple: true }, strict: { type: 'boolean' },
   table: { type: 'boolean' }, fix: { type: 'boolean' }, html: { type: 'string' }, scan: { type: 'string' }, open: { type: 'boolean' },
-  baseline: { type: 'boolean' }, 'ignore-baseline': { type: 'boolean' },
+  baseline: { type: 'boolean' }, 'ignore-baseline': { type: 'boolean' }, mcp: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } };
 let args;
 try {
@@ -52,6 +54,11 @@ try {
 const { values: o, positionals } = args;
 if (o.help) { console.log(HELP); process.exit(0); }
 if (o.version) { console.log(JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version); process.exit(0); }
+if (o.mcp) {
+  const { serveMcp } = await import('../src/mcp.js');
+  await serveMcp({ version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url))).version });
+  process.exit(0); // stdin closed: the client is gone
+}
 // Optional .envdiffrc.json in the current folder; CLI flags win. Only read-only settings are allowed here.
 let rc = {};
 try { rc = JSON.parse(readFileSync('.envdiffrc.json', 'utf8')); }

@@ -37,6 +37,16 @@ npx @guihakka2/envdiff .env.staging .env.production
     args: --keys-only --strict
 ```
 
+## Com agentes de IA (MCP)
+
+`envdiff --mcp` roda o envdiff como servidor [MCP](https://modelcontextprotocol.io): um agente de código (Claude Code, Codex, Copilot, Cursor…) consegue conferir seus `.env` sozinho, por exemplo antes de um deploy ou logo depois de criar uma variável nova. Ele recebe a mesma saída segura do `--json`: nomes de chaves, arquivos e linhas, **nunca valores**.
+
+```bash
+claude mcp add envdiff -- npx -y @guihakka2/envdiff --mcp
+```
+
+A ferramenta (`envdiff_compare`) é só leitura: não usa `--fix`, `--html` nem `--baseline`, e só lê arquivos dentro da pasta onde o servidor foi iniciado.
+
 ## Opções
 
 | Opção | O que faz |
