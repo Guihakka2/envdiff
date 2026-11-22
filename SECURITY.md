@@ -17,3 +17,4 @@ You will get a reply within 7 days.
 - `--fix` only appends `KEY=` lines; `--html` refuses to overwrite an input file; `--open` uses a private temp folder and launches the browser without a shell.
 - Parsing and "did you mean" stay fast on hostile input (unclosed quotes, thousands of keys).
 - Security problems (leaked secrets, committed `.env`, missing `.gitignore`) can never be hidden by `.envdiff-baseline.json`.
+- `--mcp` (for AI agents) is read-only: the tool cannot fix, write reports or baselines, rejects paths outside the folder it was started in, runs envdiff without a shell and returns the same value-free output as `--json`.

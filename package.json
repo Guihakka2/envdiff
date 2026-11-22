@@ -1,6 +1,6 @@
 {
   "name": "@guihakka2/envdiff",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Compare .env files across environments without ever printing secret values.",
   "type": "module",
   "bin": {
@@ -25,7 +25,9 @@
     "config",
     "devops",
     "cli",
-    "secrets"
+    "secrets",
+    "mcp",
+    "ai-agents"
   ],
   "repository": {
     "type": "git",
