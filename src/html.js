@@ -2,7 +2,7 @@
 // Keys and file names come from user files, so everything is HTML-escaped.
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const letter = (n) => String.fromCharCode(65 + n);
-const isTemplate = (name) => /example|sample|template|dist/i.test(name);
+import { isTemplate } from './index.js';
 const MASK = '••••••'; // fixed width: does not even reveal value length
 
 export function renderHtml(r, { keysOnly = false, generated = new Date().toISOString() } = {}) {

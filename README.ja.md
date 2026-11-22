@@ -63,3 +63,5 @@ claude mcp add envdiff -- npx -y @guihakka2/envdiff --mcp
 | `--json` | 機械可読なレポート（値は含まれません） |
 
 詳しいドキュメントは[英語版 README](README.md) を参照してください。ライセンス：MIT
+
+**Node.js がなくても使えます：** 各[リリース](https://github.com/Guihakka2/envdiff/releases/latest)に Windows・macOS・Linux（x64 / ARM）用のプログラムがあります。ダウンロードして展開し、ターミナルで `envdiff` を実行してください。GitHub Actions でビルドされ、`SHA256SUMS.txt` とビルド来歴の証明付き。まだ有料の署名はないため、初回は Windows の SmartScreen（「詳細情報」→「実行」）、macOS では `xattr -d com.apple.quarantine envdiff` を一度実行してください。

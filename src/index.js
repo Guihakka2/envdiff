@@ -77,7 +77,7 @@ const SECRET_PATTERNS = [
   /\beyJ[\w-]{10,}\.eyJ[\w-]{10,}\.[\w-]{10,}/,
 ];
 export const looksSecret = (v) => SECRET_PATTERNS.some((re) => re.test(v));
-const isTemplate = (name) => /example|sample|template|dist/i.test(name);
+export const isTemplate = (name) => /example|sample|template|dist/i.test(name);
 
 // files: [{ name, text }] -> report with keys only; values never leave this function.
 // Glob patterns (only * is special) -> anchored regexes.
